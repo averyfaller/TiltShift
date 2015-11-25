@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from skimage import color
+from cython.parallel import prange
+import time
 
 # A basic, parallelized Python implementation of 
 # the Tilt-Shift effect we hope to achieve in OpenCL
@@ -126,12 +128,13 @@ def round_up(global_size, group_size):
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image and convert it to grayscale
-    host_image = color.rgb2gray(mpimg.imread('MITBoathouse.png',0))
-    plt.imshow(host_image)    
+    input_image = color.rgb2gray(mpimg.imread('MITBoathouse.png',0))
+    plt.imshow(input_image)    
     plt.show()
     
+    start_time = time.time()
     #host_image = np.load('image.npz')['image'].astype(np.float32)[::2, ::2].copy()
-    output_image = np.zeros_like(host_image)
+    output_image = np.zeros_like(input_image)
 
     num_passes = 3
     # Between 0 and 1
@@ -140,9 +143,9 @@ if __name__ == '__main__':
     con = 0.0
     
     local_size = (8, 8)  # 64 pixels per work group
-    global_size = tuple([round_up(g, l) for g, l in zip(host_image.shape[::-1], local_size)])
-    width = host_image.shape[1]
-    height = host_image.shape[0]
+    global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1], local_size)])
+    width = input_image.shape[1]
+    height = input_image.shape[0]
     
     # Set up a (N+2 x N+2) local memory buffer.
     # +2 for 1-pixel halo on all sides
@@ -152,9 +155,6 @@ if __name__ == '__main__':
     buf_width = local_size[0] + 2
     buf_height = local_size[1] + 2
     halo = 1
-    
-    #TODO: Is this necessary?
-    input_image = host_image.copy()
     
     print "Image Width %s" % width
     print "Image Height %s" % height
@@ -172,7 +172,7 @@ if __name__ == '__main__':
             last_pass = True
         
         # Loop over all groups and call tiltshift once per group
-        for group_corner_x in range(0, global_size[0], local_size[0]):
+        for group_corner_x in prange(0, global_size[0], local_size[0]):
             for group_corner_y in range(0, global_size[1], local_size[1]):
                 #print "GROUP CONRER %s %s" % (group_corner_x, group_corner_y)
                 # Run tilt shift over the group and store the results in host_image_tilt_shifted
@@ -184,7 +184,10 @@ if __name__ == '__main__':
 
         # Now put the output of the last pass into the input of the next pass
         input_image = output_image
-        
+    end_time = time.time()
+    print "Took %s seconds to run %s passes" % (end_time - start_time, num_passes)   
+    
     # Display the new image
     plt.imshow(input_image)    
     plt.show()
+    mpimg.imsave("MITBoathouseGrayscaleTS.png", input_image)
