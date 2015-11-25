@@ -1,4 +1,7 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+from skimage import color
 
 # A basic, parallelized Python implementation of 
 # the Tilt-Shift effect we hope to achieve in OpenCL
@@ -122,7 +125,12 @@ def round_up(global_size, group_size):
 
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
-    host_image = np.load('image.npz')['image'].astype(np.float32)[::2, ::2].copy()
+    # Load the image and convert it to grayscale
+    host_image = color.rgb2gray(mpimg.imread('MITBoathouse.png',0))
+    plt.imshow(host_image)    
+    plt.show()
+    
+    #host_image = np.load('image.npz')['image'].astype(np.float32)[::2, ::2].copy()
     output_image = np.zeros_like(host_image)
 
     num_passes = 3
@@ -176,3 +184,7 @@ if __name__ == '__main__':
 
         # Now put the output of the last pass into the input of the next pass
         input_image = output_image
+        
+    # Display the new image
+    plt.imshow(input_image)    
+    plt.show()
