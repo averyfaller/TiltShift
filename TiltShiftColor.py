@@ -108,15 +108,13 @@ def tiltshift(input_image, output_image, buf,
         blur_amount = 1.0
         distance_to_m = abs(y - focus_m)
 
-        if distance_to_m == 0:
-            blur_amount = 0.1
+        # The edge of the in-focus area should fade to blurry so that there is not an abrupt transition
+        no_blur_region = .9 * focus_r
+        # If it is within the middle 90% then don't have any blur at all, but then linearly increase to 1.0
+        if distance_to_m < no_blur_region:
+            blur_amount = 0
         elif (distance_to_m < focus_r):
-            blur_amount = math.log10(y / (distance_to_m / 10.0))
-            blur_amount = max(blur_amount, 0)
-        if blur_amount < 0.1:
-            blur_amount = 0.1
-        elif blur_amount > 1.0:
-            blur_amount = 1.0
+            blur_amount = (1.0 / (focus_r - no_blur_region)) * (distance_to_m - no_blur_region)
             
         for lx in range(0, l_w):
             # Initialize Global x Position
@@ -176,11 +174,11 @@ if __name__ == '__main__':
     # Contrast - Between -255 and 255
     con = 0.0
     # The y-index of the center of the in-focus region
-    middle_in_focus = 500
+    middle_in_focus = 600
     # The number of pixels to either side of the middle_in_focus to keep in focus
-    in_focus_radius = 200
+    in_focus_radius = 50
 
-    local_size = (256, 256)  # 64 pixels per work group
+    local_size = (256, 256)  # This doesn't really affect speed for the Python implementation
     # We need to add [1:] because the first element in this list is the number of colors in RGB, namely 3
     global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1][1:], local_size)])
     width = input_image.shape[1]
