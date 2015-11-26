@@ -4,6 +4,7 @@ import matplotlib.image as mpimg
 from skimage import color
 from cython.parallel import prange
 import time
+import math
 
 # A basic, parallelized Python implementation of 
 # the Tilt-Shift effect we hope to achieve in OpenCL
@@ -16,7 +17,7 @@ import time
 def boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8):
     # Calculate the blur amount for the central and 
     # neighboring pixels
-    self_blur_amount = (9 - blur_amount * 8) / 9.0
+    self_blur_amount = (9 - (blur_amount * 8)) / 9.0
     other_blur_amount = blur_amount / 9.0
     
     # Sum a weighted average of self and others based on the blur amount
@@ -49,6 +50,7 @@ def tiltshift(input_image, output_image, buf,
               w, h, 
               buf_w, buf_h, halo, 
               sat, con, last_pass,
+              focus_m, focus_r,
               g_corner_x, g_corner_y):
         
     # coordinates of the upper left corner of the buffer in image space, including halo
@@ -80,18 +82,30 @@ def tiltshift(input_image, output_image, buf,
     
     # Loop over y first so we can calculate the bluramount    
     for ly in range(0, 8):
-        # TODO: blur_amount shouldn't be a constant!
+        # Initialize Global y Position
+        y = ly + g_corner_y
+        # Initialize Buffer y Position
+        buf_y = ly + halo;
+
+        # The blur amount depends on the y-value of the pixel
         blur_amount = 1.0
+        distance_to_m = abs(y - focus_m)
+
+        if distance_to_m == 0:
+            blur_amount = 0.1
+        elif (distance_to_m < focus_r):
+            blur_amount = math.log10(y / (distance_to_m / 10.0))
+            blur_amount = max(blur_amount, 0)
+        if blur_amount < 0.1:
+            blur_amount = 0.1
+        elif blur_amount > 1.0:
+            blur_amount = 1.0
             
         for lx in range(0, 8):
-            
-            # Initialize Global Positions
+            # Initialize Global x Position
             x = lx + g_corner_x
-            y = ly + g_corner_y
-            
-            # Initialize Buffer Positions
+            # Initialize Buffer x Position
             buf_x = lx + halo;
-            buf_y = ly + halo;
     
             # Stay in bounds check is necessary due to possible 
             # images with size not nicely divisible by workgroup size
@@ -136,11 +150,20 @@ if __name__ == '__main__':
     #host_image = np.load('image.npz')['image'].astype(np.float32)[::2, ::2].copy()
     output_image = np.zeros_like(input_image)
 
+    ################################
+    ### USER CHANGEABLE SETTINGS ###
+    ################################
+    # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 3
-    # Between 0 and 1
+    # Saturation - Between 0 and 1
     sat = 0.0
-    # Between -255 and 255
+    # Contrast - Between -255 and 255
     con = 0.0
+    # The y-index of the center of the in-focus region
+    middle_in_focus = 500
+    # The number of pixels to either side of the middle_in_focus to keep in focus
+    in_focus_radius = 200
+
     
     local_size = (8, 8)  # 64 pixels per work group
     global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1], local_size)])
@@ -180,6 +203,7 @@ if __name__ == '__main__':
                           width, height, 
                           buf_width, buf_height, halo, 
                           sat, con, last_pass, 
+                          middle_in_focus, in_focus_radius,
                           group_corner_x, group_corner_y)
 
         # Now put the output of the last pass into the input of the next pass
