@@ -21,23 +21,39 @@ def boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8):
     other_blur_amount = blur_amount / 9.0
     
     # Sum a weighted average of self and others based on the blur amount
-    return (self_blur_amount * p4) + (other_blur_amount * (p0 + p1 + p2 + p3 + p5 + p6 + p7 + p8))
+    #print "--------"
+    #print 0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0]
+
+    red_v = (self_blur_amount * p4[0]) + (other_blur_amount * (0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0])) 
+    blue_v = (self_blur_amount * p4[1]) + (other_blur_amount * (0 + p0[1] + p1[1] + p2[1] + p3[1] + p5[1] + p6[1] + p7[1] + p8[1])) 
+    green_v = (self_blur_amount * p4[2]) + (other_blur_amount * (0 + p0[2] + p1[2] + p2[2] + p3[2] + p5[2] + p6[2] + p7[2] + p8[2]))
+    #print "Original %s" % p4
+    #print "New %s" % [int(red_v), int(blue_v), int(green_v)]
+    #print "--------"
+    return [int(red_v), int(blue_v), int(green_v)]
     
 # Adjusts the saturation of a pixel    
 def saturation(p, value):
-    return p * (1 - value)
+    red_v = p[0] * (1 - value) 
+    blue_v = p[1] * (1 - value) 
+    green_v = p[2] * (1 - value) 
+    return [red_v, blue_v, green_v]
     
 # Adjusts the contrast on a pixel    
 def contrast(p, value):
     factor = (259 * (value + 255)) / float(255 * (259 - value))
-    return truncate(factor * (p - 128) + 128)
+    red = truncate(factor * (p[0] - 128) + 128)
+    green = truncate(factor * (p[1] - 128) + 128)
+    blue = truncate(factor * (p[2] - 128) + 128)
+    return [red, green, blue]
     
-# Ensures a pixel's value is between 0 and 255
+# Ensures a pixel's value for a color is between 0 and 255
 def truncate(value):
     if value < 0:
-        return 0
+        value = 0
     elif value > 255:
-        return 255
+        value = 255
+
     return value
 
 # Applies the tilt-shift effect onto an image (grayscale for now)
@@ -49,6 +65,7 @@ def truncate(value):
 def tiltshift(input_image, output_image, buf, 
               w, h, 
               buf_w, buf_h, halo, 
+              l_w, l_h,
               sat, con, last_pass,
               focus_m, focus_r,
               g_corner_x, g_corner_y):
@@ -81,7 +98,7 @@ def tiltshift(input_image, output_image, buf,
                 buf[row * buf_w + col] = input_image[buf_corner_y + tmp_y, buf_corner_x + tmp_x];
     
     # Loop over y first so we can calculate the bluramount    
-    for ly in range(0, 8):
+    for ly in range(0, l_h):
         # Initialize Global y Position
         y = ly + g_corner_y
         # Initialize Buffer y Position
@@ -101,7 +118,7 @@ def tiltshift(input_image, output_image, buf,
         elif blur_amount > 1.0:
             blur_amount = 1.0
             
-        for lx in range(0, 8):
+        for lx in range(0, l_w):
             # Initialize Global x Position
             x = lx + g_corner_x
             # Initialize Buffer x Position
@@ -142,12 +159,11 @@ def round_up(global_size, group_size):
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image and convert it to grayscale
-    input_image = color.rgb2gray(mpimg.imread('MITBoathouse.png',0))
+    input_image = mpimg.imread('MITBoathouse.png',0)
     plt.imshow(input_image)    
     plt.show()
     
     start_time = time.time()
-    #host_image = np.load('image.npz')['image'].astype(np.float32)[::2, ::2].copy()
     output_image = np.zeros_like(input_image)
 
     ################################
@@ -164,15 +180,15 @@ if __name__ == '__main__':
     # The number of pixels to either side of the middle_in_focus to keep in focus
     in_focus_radius = 200
 
-    
-    local_size = (8, 8)  # 64 pixels per work group
-    global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1], local_size)])
+    local_size = (256, 256)  # 64 pixels per work group
+    # We need to add [1:] because the first element in this list is the number of colors in RGB, namely 3
+    global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1][1:], local_size)])
     width = input_image.shape[1]
     height = input_image.shape[0]
     
     # Set up a (N+2 x N+2) local memory buffer.
     # +2 for 1-pixel halo on all sides
-    local_memory = np.zeros((local_size[0] + 2) * (local_size[1] + 2))
+    local_memory = [[]] * (local_size[0] + 2) * (local_size[1] + 2) #np.zeros((local_size[0] + 2) * (local_size[1] + 2))
     
     # Each work group will have its own private buffer.
     buf_width = local_size[0] + 2
@@ -191,17 +207,18 @@ if __name__ == '__main__':
         # automatically set up by Python
         last_pass = False
         if pass_num == num_passes - 1:
-            print "In Last Pass"
+            print "---Last Pass---"
             last_pass = True
         
         # Loop over all groups and call tiltshift once per group
-        for group_corner_x in prange(0, global_size[0], local_size[0]):
+        for group_corner_x in range(0, global_size[0], local_size[0]):
             for group_corner_y in range(0, global_size[1], local_size[1]):
                 #print "GROUP CONRER %s %s" % (group_corner_x, group_corner_y)
                 # Run tilt shift over the group and store the results in host_image_tilt_shifted
                 tiltshift(input_image, output_image, local_memory, 
                           width, height, 
                           buf_width, buf_height, halo, 
+                          local_size[0], local_size[1],
                           sat, con, last_pass, 
                           middle_in_focus, in_focus_radius,
                           group_corner_x, group_corner_y)
@@ -214,4 +231,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(input_image)    
     plt.show()
-    mpimg.imsave("MITBoathouseGrayscaleTS.png", input_image)
+    mpimg.imsave("MITBoathouseColorTS.png", input_image)
