@@ -3,10 +3,10 @@
 // bluramount of 1 is full blur and will weight the neighboring
 // pixels equally with the pixel that is being modified.  
 // While a bluramount of 0 will result in no blurring.
-inline uint3 boxblur(float blur_amount, 
-                     uint3 p0, uint3 p1, uint3 p2, 
-                     uint3 p3, uint3 p4, uint3 p5, 
-                     uint3 p6, uint3 p7, uint3 p8) {
+inline uint boxblur(float blur_amount, 
+                     uchar4 p0, uchar4 p1, uchar4 p2, 
+                     uchar4 p3, uchar4 p4, uchar4 p5, 
+                     uchar4 p6, uchar4 p7, uchar4 p8) {
     
     // Calculate the blur amount for the central and 
     // neighboring pixels
@@ -14,17 +14,11 @@ inline uint3 boxblur(float blur_amount,
     float other_blur_amount = blur_amount / 9.0;
     
     // Sum a weighted average of self and others based on the blur amount
-    // print "--------"
-    // print 0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0]
-
-    uint red_v = (self_blur_amount * p4.x) + (other_blur_amount * (0 + p0.x + p1.x + p2.x + p3.x + p5.x + p6.x + p7.x + p8.x));
-    uint blue_v = (self_blur_amount * p4.y) + (other_blur_amount * (0 + p0.y + p1.y + p2.y + p3.y + p5.y + p6.y + p7.y + p8.y));
-    uint green_v = (self_blur_amount * p4.z) + (other_blur_amount * (0 + p0.z + p1.z + p2.z + p3.z + p5.z + p6.z + p7.z + p8.z));
+    uchar red_v = (self_blur_amount * p4.y) + (other_blur_amount * (p0.y + p1.y + p2.y + p3.y + p5.y + p6.y + p7.y + p8.y));
+    uchar green_v = (self_blur_amount * p4.z) + (other_blur_amount * (p0.z + p1.z + p2.z + p3.z + p5.z + p6.z + p7.z + p8.z));
+    uchar blue_v = (self_blur_amount * p4.w) + (other_blur_amount * (p0.w + p1.w + p2.w + p3.w + p5.w + p6.w + p7.w + p8.w));
         
-    uint3 blur = {red_v, blue_v, green_v};
-    // print "Original %s" % p4
-    // print "New %s" % [int(red_v), int(blue_v), int(green_v)]
-    // print "--------"
+    uint blur = (red_v << 16) + (green_v << 8) + blue_v;
     return blur;
 }
 
@@ -35,9 +29,9 @@ inline uint3 boxblur(float blur_amount,
 // All of the work for a workgroup happens in one thread in 
 // this method
 __kernel void
-tiltshift(__global __read_only uint3* in_values, 
-          __global __write_only uint3* out_values, 
-          __local uint3* buf, 
+tiltshift(__global __read_only uint* in_values, 
+          __global __write_only uint* out_values, 
+          __local uchar4* buf, 
           int w, int h, 
           int buf_w, int buf_h, 
           const int halo,
@@ -84,8 +78,10 @@ tiltshift(__global __read_only uint3* in_values,
             } else if (buf_corner_y + tmp_y >= h) {
                 tmp_y--;
             }
-                
-            buf[row * buf_w + idx_1D] = in_values[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
+             
+            uint accessed = in_values[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
+            uchar4 expanded = {0, ((accessed >> 16) & 0xFF), ((accessed >> 8) & 0xFF), ((accessed) & 0xFF)};
+            buf[row * buf_w + idx_1D] = expanded;
         }
     }
 
@@ -107,18 +103,18 @@ tiltshift(__global __read_only uint3* in_values,
     // Stay in bounds check is necessary due to possible 
     // images with size not nicely divisible by workgroup size
     if ((y < h) && (x < w)) {
-        uint3 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1];
-        uint3 p1 = buf[((buf_y - 1) * buf_w) + buf_x];
-        uint3 p2 = buf[((buf_y - 1) * buf_w) + buf_x + 1];
-        uint3 p3 = buf[(buf_y * buf_w) + buf_x - 1];
-        uint3 p4 = buf[(buf_y * buf_w) + buf_x];
-        uint3 p5 = buf[(buf_y * buf_w) + buf_x + 1];
-        uint3 p6 = buf[((buf_y + 1) * buf_w) + buf_x - 1];
-        uint3 p7 = buf[((buf_y + 1) * buf_w) + buf_x];
-        uint3 p8 = buf[((buf_y + 1) * buf_w) + buf_x + 1];
+        uchar4 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1];
+        uchar4 p1 = buf[((buf_y - 1) * buf_w) + buf_x];
+        uchar4 p2 = buf[((buf_y - 1) * buf_w) + buf_x + 1];
+        uchar4 p3 = buf[(buf_y * buf_w) + buf_x - 1];
+        uchar4 p4 = buf[(buf_y * buf_w) + buf_x];
+        uchar4 p5 = buf[(buf_y * buf_w) + buf_x + 1];
+        uchar4 p6 = buf[((buf_y + 1) * buf_w) + buf_x - 1];
+        uchar4 p7 = buf[((buf_y + 1) * buf_w) + buf_x];
+        uchar4 p8 = buf[((buf_y + 1) * buf_w) + buf_x + 1];
                 
         // Perform boxblur
-        uint3 blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8);
+        uint blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8);
                     
         // If we're in the last pass, perform the saturation and contrast adjustments as well
         if (last_pass) {

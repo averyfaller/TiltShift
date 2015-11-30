@@ -44,8 +44,22 @@ def round_up(global_size, group_size):
 
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
+    # Load the image
+    input_image = mpimg.imread('../MITBoathouse.png',0)
+    plt.imshow(input_image)    
+    plt.show()
+    
+    # Start the clock
     start_time = time.time()
     
+    # Convert the image from (h, w, 3) to (h, w), storing the RGB value into an int
+    image_combined = (input_image[...,0].astype(np.uint32) << 16) + (input_image[...,1].astype(np.uint32) << 8) + (input_image[...,2].astype(np.uint32) << 0)
+    print image_combined.shape
+    
+    # Make the placeholders for the output image and output combined
+    output_combined = np.zeros_like(image_combined)
+    host_image_filtered = np.zeros_like(input_image)
+        
     # List our platforms
     platforms = cl.get_platforms()
     print 'The platforms detected are:'
@@ -66,7 +80,7 @@ if __name__ == '__main__':
 
     # Create a context with all the devices
     devices = platforms[0].get_devices()
-    context = cl.Context(devices[2:])
+    context = cl.Context(devices[1:])
     print 'This context is associated with ', len(context.devices), 'devices'
     
     # Create a queue for transferring data and launching computations.
@@ -78,21 +92,18 @@ if __name__ == '__main__':
     curdir = os.path.dirname(os.path.realpath(__file__))
     program = cl.Program(context, open('TiltShiftColor.cl').read()).build(options=['-I', curdir])
     
-    # Load the image
-    input_image = mpimg.imread('../MITBoathouse.png',0)
-    host_image_filtered = np.zeros_like(input_image)
-    plt.imshow(input_image)    
-    plt.show()
+    print image_combined.size
     
-    gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, input_image.size * 4)
-    gpu_image_b = cl.Buffer(context, cl.mem_flags.READ_WRITE, input_image.size * 4)
+    gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
+    gpu_image_b = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
     
     local_size = (8, 8)  # This doesn't really affect speed for the Python implementation
     # We need to add [1:] because the first element in this list is the number of colors in RGB, namely 3
-    global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1][1:], local_size)])
+    #global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1][1:], local_size)])
+    global_size = tuple([round_up(g, l) for g, l in zip(image_combined.shape[::-1], local_size)])
     print global_size
-    width = np.int32(input_image.shape[1])
-    height = np.int32(input_image.shape[0])
+    width = np.int32(image_combined.shape[1])
+    height = np.int32(image_combined.shape[0])
     
     # Set up a (N+2 x N+2) local memory buffer.
     # +2 for 1-pixel halo on all sides, 4 bytes for float.
@@ -103,7 +114,7 @@ if __name__ == '__main__':
     halo = np.int32(1)
     
     # Send image to the device, non-blocking
-    cl.enqueue_copy(queue, gpu_image_a, input_image, is_blocking=False)
+    cl.enqueue_copy(queue, gpu_image_a, image_combined, is_blocking=False)
     
     ################################
     ### USER CHANGEABLE SETTINGS ###
@@ -146,7 +157,20 @@ if __name__ == '__main__':
         # Now put the output of the last pass into the input of the next pass
         gpu_image_a, gpu_image_b = gpu_image_b, gpu_image_a
     
-    cl.enqueue_copy(queue, host_image_filtered, gpu_image_a, is_blocking=True)
+    cl.enqueue_copy(queue, output_combined, gpu_image_a, is_blocking=True)
+    
+    print ((output_combined[0,0] >> 16) & 0xFF)
+    print ((output_combined[0,0] >> 8) & 0xFF)
+    print ((output_combined[0,0]) & 0xFF)
+    host_image_filtered[...,0] = ((output_combined >> 16) & 0xFF)
+    host_image_filtered[...,1] = ((output_combined >> 8) & 0xFF)
+    host_image_filtered[...,2] = ((output_combined) & 0xFF)
+    
+    print input_image[0][0]
+    print host_image_filtered[0][0]
+    
+    print input_image[1][1]
+    print host_image_filtered[1][1]
     
     end_time = time.time()
     print "Took %s seconds to run %s passes" % (end_time - start_time, num_passes)   
