@@ -25,12 +25,12 @@ def boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8):
     #print 0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0]
 
     red_v = (self_blur_amount * p4[0]) + (other_blur_amount * (0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0])) 
-    blue_v = (self_blur_amount * p4[1]) + (other_blur_amount * (0 + p0[1] + p1[1] + p2[1] + p3[1] + p5[1] + p6[1] + p7[1] + p8[1])) 
-    green_v = (self_blur_amount * p4[2]) + (other_blur_amount * (0 + p0[2] + p1[2] + p2[2] + p3[2] + p5[2] + p6[2] + p7[2] + p8[2]))
+    green_v = (self_blur_amount * p4[1]) + (other_blur_amount * (0 + p0[1] + p1[1] + p2[1] + p3[1] + p5[1] + p6[1] + p7[1] + p8[1])) 
+    blue_v = (self_blur_amount * p4[2]) + (other_blur_amount * (0 + p0[2] + p1[2] + p2[2] + p3[2] + p5[2] + p6[2] + p7[2] + p8[2]))
     #print "Original %s" % p4
     #print "New %s" % [int(red_v), int(blue_v), int(green_v)]
     #print "--------"
-    return [int(red_v), int(blue_v), int(green_v)]
+    return [int(red_v), int(green_v), int(blue_v)]
     
 # Adjusts the saturation of a pixel    
 def saturation(p, value):
@@ -110,7 +110,7 @@ def tiltshift(input_image, output_image, buf,
 
         # The edge of the in-focus area should fade to blurry so that there is not an abrupt transition
         no_blur_region = .8 * focus_r
-        # If it is within the middle 90% then don't have any blur at all, but then linearly increase to 1.0
+        # If it is within the middle 80% then don't have any blur at all, but then linearly increase to 1.0
         if distance_to_m < no_blur_region:
             blur_amount = 0
         elif (distance_to_m < focus_r):

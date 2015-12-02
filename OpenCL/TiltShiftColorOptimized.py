@@ -52,12 +52,14 @@ if __name__ == '__main__':
     # Start the clock
     start_time = time.time()
     
+    conversion_start_time = time.time()
     # Convert the image from (h, w, 3) to (h, w), storing the RGB value into an int
     image_combined = (input_image[...,0].astype(np.uint32) << 16) + (input_image[...,1].astype(np.uint32) << 8) + (input_image[...,2].astype(np.uint32) << 0)
+    conversion_end_time = time.time()
     print image_combined.shape
     
     # Make the placeholders for the output image and output combined
-    output_combined = np.zeros_like(image_combined)
+    #output_combined = np.zeros_like(image_combined)
     host_image_filtered = np.zeros_like(input_image)
         
     # List our platforms
@@ -90,18 +92,18 @@ if __name__ == '__main__':
     print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
-    program = cl.Program(context, open('TiltShiftColor.cl').read()).build(options=['-I', curdir])
-    
-    print image_combined.size
-    
+    program = cl.Program(context, open('TiltShiftColorBaseline.cl').read()).build(options=['-I', curdir])
+        
+    buf_start_time = time.time()
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
     gpu_image_b = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
+    buf_end_time = time.time()
     
-    local_size = (8, 8)  # This doesn't really affect speed for the Python implementation
-    # We need to add [1:] because the first element in this list is the number of colors in RGB, namely 3
-    #global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1][1:], local_size)])
+    # These settings for local_size appear to work best on my computer, not entirely sure why
+    # (HD Graphics 4000 [Type: GPU] Maximum work group size 512)
+    local_size = (256, 2)
     global_size = tuple([round_up(g, l) for g, l in zip(image_combined.shape[::-1], local_size)])
-    print global_size
+
     width = np.int32(image_combined.shape[1])
     height = np.int32(image_combined.shape[0])
     
@@ -114,7 +116,9 @@ if __name__ == '__main__':
     halo = np.int32(1)
     
     # Send image to the device, non-blocking
+    enqueue_start_time = time.time()
     cl.enqueue_copy(queue, gpu_image_a, image_combined, is_blocking=False)
+    enqueue_end_time = time.time()
     
     ################################
     ### USER CHANGEABLE SETTINGS ###
@@ -133,6 +137,7 @@ if __name__ == '__main__':
     print "Image Width %s" % width
     print "Image Height %s" % height
     
+    kernel_start_time = time.time()
     # We will perform 3 passes of the bux blur 
     # effect to approximate Gaussian blurring
     for pass_num in range(num_passes):
@@ -142,7 +147,7 @@ if __name__ == '__main__':
         # automatically set up by Python
         last_pass = np.bool_(False)
         if pass_num == num_passes - 1:
-            print "---Last Pass---"
+            print "Last Pass!"
             last_pass = np.bool_(True)
             
         # Run tilt shift over the group and store the results in host_image_tilt_shifted
@@ -156,24 +161,27 @@ if __name__ == '__main__':
 
         # Now put the output of the last pass into the input of the next pass
         gpu_image_a, gpu_image_b = gpu_image_b, gpu_image_a
+    kernel_end_time = time.time()
     
-    cl.enqueue_copy(queue, output_combined, gpu_image_a, is_blocking=True)
+    dequeue_start_time = time.time()
+    cl.enqueue_copy(queue, image_combined, gpu_image_a, is_blocking=True)
+    dequeue_end_time = time.time()
     
-    print ((output_combined[0,0] >> 16) & 0xFF)
-    print ((output_combined[0,0] >> 8) & 0xFF)
-    print ((output_combined[0,0]) & 0xFF)
-    host_image_filtered[...,0] = ((output_combined >> 16) & 0xFF)
-    host_image_filtered[...,1] = ((output_combined >> 8) & 0xFF)
-    host_image_filtered[...,2] = ((output_combined) & 0xFF)
-    
-    print input_image[0][0]
-    print host_image_filtered[0][0]
-    
-    print input_image[1][1]
-    print host_image_filtered[1][1]
+    reconversion_start_time = time.time()
+    host_image_filtered[...,0] = ((image_combined >> 16) & 0xFF)
+    host_image_filtered[...,1] = ((image_combined >> 8) & 0xFF)
+    host_image_filtered[...,2] = ((image_combined) & 0xFF)
+    reconversion_end_time = time.time()
     
     end_time = time.time()
-    print "Took %s seconds to run %s passes" % (end_time - start_time, num_passes)   
+    print "####### TIMING BREAKDOWN #######"
+    print "Took %s total seconds to run %s passes" % (end_time - start_time, num_passes)  
+    print "Conversion time was %s seconds" % (conversion_end_time - conversion_start_time) 
+    print "Buf creation time was %s seconds" % (buf_end_time - buf_start_time)
+    print "Enqueue time was %s seconds" % (enqueue_end_time - enqueue_start_time) 
+    print "Kernel time was %s seconds" % (kernel_end_time - kernel_start_time)  
+    print "Dequeue time was %s seconds" % (dequeue_end_time - dequeue_start_time) 
+    print "Reconversion time was %s seconds" % (reconversion_end_time - reconversion_start_time) 
     
     # Display the new image
     plt.imshow(host_image_filtered)    
