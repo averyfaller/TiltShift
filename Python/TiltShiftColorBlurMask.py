@@ -67,7 +67,6 @@ def tiltshift(input_image, output_image, buf, blur_mask,
               buf_w, buf_h, halo, 
               l_w, l_h,
               sat, con, last_pass,
-              focus_m, focus_r,
               g_corner_x, g_corner_y):
         
     # coordinates of the upper left corner of the buffer in image space, including halo
@@ -147,14 +146,10 @@ def round_up(global_size, group_size):
     return global_size + group_size - r
     
     
-# generates blur mask using focus middle, focus radius, and image height,
+# generates horizontal blur mask using focus middle, focus radius, and image height,
 # and stores the blur mask in the blur_mask parameter (np.array)
-def generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
+def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
     # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
-    
-    # find values of y that are within the focus radius
-    focus_y_max = min(middle_in_focus + in_focus_radius, height - 1)
-    focus_y_min = max(middle_in_focus - in_focus_radius, 0)
     
     # Loop over y first so we can calculate the blur amount
     # fade out 20% to blurry so that there is not an abrupt transition
@@ -182,7 +177,52 @@ def generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
             blur_mask[y] = blur_row
         if middle_in_focus + distance_to_m < height:
             blur_mask[middle_in_focus + distance_to_m] = blur_row
-
+            
+# generates horizontal blur mask using focus middle, focus radius, and image height,
+# and stores the blur mask in the blur_mask parameter (np.array)            
+def generate_circular_blur_mask(blur_mask, middle_in_focus_x,middle_in_focus_y, in_focus_radius, width, height):
+    # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
+    
+    
+    # fade out 20% to blurry so that there is not an abrupt transition
+    no_blur_region = .8 * in_focus_radius
+    
+    # Set blur amount (no blur) for center of in-focus region
+    blur_mask[middle_in_focus_y, middle_in_focus_x] = 0.0
+    
+    # Loop over x and y first so we can calculate the blur amount
+    for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x):
+        for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y):
+            
+            # The blur amount depends on the euclidean distance between the pixel and focus center
+            x_distance_to_m = x - middle_in_focus_x
+            y_distance_to_m = y - middle_in_focus_y
+            distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
+            
+            # Note: Not all values we iterate over are within the focus region, so we must check
+            if distance_to_m < no_blur_region:
+                # No blur
+                blur_amount = 0.0
+            # Check if we should fade to blurry so that there is not an abrupt transition
+            elif distance_to_m < in_focus_radius:
+                blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
+            else:
+                # Completely blurred
+                blur_amount = 1.0
+            
+            # Set the blur_amount for 4 pixels of the same distance from the center of the in-focus region
+            if x > 0:
+                if y > 0:
+                    blur_mask[y, x] = blur_amount
+                if middle_in_focus_y + y_distance_to_m < height:
+                    blur_mask[middle_in_focus_y + y_distance_to_m, x] = blur_amount
+            if middle_in_focus_x + x_distance_to_m < width:
+                if y > 0:
+                    blur_mask[y, middle_in_focus_x + x_distance_to_m] = blur_amount
+                if middle_in_focus_y + y_distance_to_m < height:
+                    blur_mask[middle_in_focus_y + y_distance_to_m, middle_in_focus_x + x_distance_to_m] = blur_amount
+            
+    
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image and convert it to grayscale
@@ -203,9 +243,19 @@ if __name__ == '__main__':
     # Contrast - Between -255 and 255
     con = 0.0
     # The y-index of the center of the in-focus region
-    middle_in_focus = 600
-    # The number of pixels to either side of the middle_in_focus to keep in focus
-    in_focus_radius = 50
+    middle_in_focus_y = 420
+    # Circle in-focus region, or horizontal in-focus region
+    focused_circle = True
+    # The x-index of the center of the in-focus region
+    # Note: this only matters for circular in-focus region
+    middle_in_focus_x = 650
+    
+    # The number of pixels distance from middle_in_focus to keep in focus
+    in_focus_radius = 200
+    
+    ######################################
+    ### USER CHANGEABLE SETTINGS - END ###
+    ######################################
 
     local_size = (256, 256)  # This doesn't really affect speed for the Python implementation
     # We need to add [1:] because the first element in this list is the number of colors in RGB, namely 3
@@ -230,7 +280,10 @@ if __name__ == '__main__':
     # Note: There is one float blur amount per pixel
     blur_mask = np.ones(input_image.shape[:2], dtype=np.float)
     # Generate the blur mask
-    generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height)
+    if focused_circle:
+        generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+    else:
+        generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
     
     # We will perform 3 passes of the bux blur 
     # effect to approximate Gaussian blurring
@@ -254,7 +307,6 @@ if __name__ == '__main__':
                           buf_width, buf_height, halo, 
                           local_size[0], local_size[1],
                           sat, con, last_pass, 
-                          middle_in_focus, in_focus_radius,
                           group_corner_x, group_corner_y)
 
         # Now put the output of the last pass into the input of the next pass
