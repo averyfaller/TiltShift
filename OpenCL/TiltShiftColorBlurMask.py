@@ -42,16 +42,10 @@ def round_up(global_size, group_size):
         return global_size
     return global_size + group_size - r
 
-# generates blur mask using focus middle, focus radius, and image height,
+# Generates a horizontal blur mask using focus middle, focus radius, and image height
 # and stores the blur mask in the blur_mask parameter (np.array)
-def generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
+def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
     # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
-    
-    # find values of y that are within the focus radius
-    #focus_y_max = min(middle_in_focus + in_focus_radius, height - 1)
-    #focus_y_min = max(middle_in_focus - in_focus_radius, 0)
-    #print focus_y_max
-    #print focus_y_min
 
     # Linearly fade out the last 20% on each side to blurry,
     # so that there is not an abrupt transition
@@ -80,6 +74,47 @@ def generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
             blur_mask[y] = blur_row
         if middle_in_focus + distance_to_m < height:
             blur_mask[middle_in_focus + distance_to_m] = blur_row
+            
+# Generates a circular horizontal blur mask using the x and y coordinates of the focus middle, 
+# focus radius, and image height, and stores the blur mask in the blur_mask parameter (np.array)            
+def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height):
+    # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
+
+    # Fade out 20% to blurry so that there is not an abrupt transition
+    no_blur_region = .8 * in_focus_radius
+    
+    # Set blur amount (no blur) for center of in-focus region
+    #blur_mask[middle_in_focus_y, middle_in_focus_x] = 0.0
+    
+    # Loop over x and y first so we can calculate the blur amount
+    for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + 1):
+        for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + 1):
+            
+            # The blur amount depends on the euclidean distance between the pixel and focus center
+            x_distance_to_m = abs(x - middle_in_focus_x)
+            y_distance_to_m = abs(y - middle_in_focus_y)
+            distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
+            
+            blur_amount = 1.0
+            # Note: Not all values we iterate over are within the focus region, so we must check
+            if distance_to_m < no_blur_region:
+                # No blur
+                blur_amount = 0.0
+            # Check if we should fade to blurry so that there is not an abrupt transition
+            elif distance_to_m < in_focus_radius:
+                blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
+            
+            # Set the blur_amount for 4 pixels of the same distance from the center of the in-focus region
+            if x > 0:
+                if y > 0:
+                    blur_mask[y, x] = blur_amount
+                if middle_in_focus_y + y_distance_to_m < height:
+                    blur_mask[middle_in_focus_y + y_distance_to_m, x] = blur_amount
+            if middle_in_focus_x + x_distance_to_m < width:
+                if y > 0:
+                    blur_mask[y, middle_in_focus_x + x_distance_to_m] = blur_amount
+                if middle_in_focus_y + y_distance_to_m < height:
+                    blur_mask[middle_in_focus_y + y_distance_to_m, middle_in_focus_x + x_distance_to_m] = blur_amount
 
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
@@ -131,7 +166,7 @@ if __name__ == '__main__':
     print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
-    program = cl.Program(context, open('TiltShiftColorBaselineBlurMask.cl').read()).build(options=['-I', curdir])
+    program = cl.Program(context, open('TiltShiftColorBlurMask.cl').read()).build(options=['-I', curdir])
         
     buf_start_time = time.time()
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
@@ -157,6 +192,7 @@ if __name__ == '__main__':
     ################################
     ### USER CHANGEABLE SETTINGS ###
     ################################
+    ### General settings ###
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 3
     # Saturation - Between 0 and 1
@@ -164,9 +200,15 @@ if __name__ == '__main__':
     # Contrast - Between -255 and 255
     con = np.float32(0.0)
     # The y-index of the center of the in-focus region
-    middle_in_focus = np.int32(600)
+    middle_in_focus_y = np.int32(300)
     # The number of pixels to either side of the middle_in_focus to keep in focus
-    in_focus_radius = np.int32(50)
+    in_focus_radius = np.int32(100)
+
+    ### Circle specific settings ###
+    # Circle in-focus region, or horizontal in-focus region
+    focused_circle = True
+    # The x-index of the center of the in-focus region
+    middle_in_focus_x = np.int32(650)
     ####################################
     ### END USER CHANGEABLE SETTINGS ###
     ####################################
@@ -175,7 +217,16 @@ if __name__ == '__main__':
     # Note: There is one float blur amount per pixel
     blur_mask = np.ones_like(image_combined, dtype=np.float32)
     # Generate the blur mask
-    generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height)
+    if focused_circle:
+        print "Genearting a circular blur mask around (%s, %s)" % (middle_in_focus_x, middle_in_focus_y)
+        # Circular Blur Mask
+        generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+    else:
+        print "Genearting a horizontal blur mask %s" % middle_in_focus_y
+        # Horizontal Blur Mask
+        generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
+    
+    # Set the 4th parameter in the input image to be the blur amount for that pixel
     image_combined += ((255 * blur_mask).astype(np.uint32) << 24)
 
     # Send image to the device, non-blocking
@@ -206,8 +257,7 @@ if __name__ == '__main__':
                           gpu_image_a, gpu_image_b, local_memory, 
                           width, height, 
                           buf_width, buf_height, halo,
-                          sat, con, last_pass, 
-                          middle_in_focus, in_focus_radius)
+                          sat, con, last_pass)
 
         # Now put the output of the last pass into the input of the next pass
         gpu_image_a, gpu_image_b = gpu_image_b, gpu_image_a

@@ -107,8 +107,6 @@ def tiltshift(input_image, output_image, buf, blur_mask,
             x = lx + g_corner_x
             # Initialize Buffer x Position
             buf_x = lx + halo;
-            
-            
     
             # Stay in bounds check is necessary due to possible 
             # images with size not nicely divisible by workgroup size
@@ -178,27 +176,27 @@ def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, h
         if middle_in_focus + distance_to_m < height:
             blur_mask[middle_in_focus + distance_to_m] = blur_row
             
-# generates horizontal blur mask using focus middle, focus radius, and image height,
-# and stores the blur mask in the blur_mask parameter (np.array)            
-def generate_circular_blur_mask(blur_mask, middle_in_focus_x,middle_in_focus_y, in_focus_radius, width, height):
+# Generates a circular horizontal blur mask using the x and y coordinates of the focus middle, 
+# focus radius, and image height, and stores the blur mask in the blur_mask parameter (np.array)            
+def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height):
     # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
-    
-    
-    # fade out 20% to blurry so that there is not an abrupt transition
+
+    # Fade out 20% to blurry so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
     
     # Set blur amount (no blur) for center of in-focus region
-    blur_mask[middle_in_focus_y, middle_in_focus_x] = 0.0
+    #blur_mask[middle_in_focus_y, middle_in_focus_x] = 0.0
     
     # Loop over x and y first so we can calculate the blur amount
-    for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x):
-        for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y):
+    for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + 1):
+        for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + 1):
             
             # The blur amount depends on the euclidean distance between the pixel and focus center
-            x_distance_to_m = x - middle_in_focus_x
-            y_distance_to_m = y - middle_in_focus_y
+            x_distance_to_m = abs(x - middle_in_focus_x)
+            y_distance_to_m = abs(y - middle_in_focus_y)
             distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
             
+            blur_amount = 1.0
             # Note: Not all values we iterate over are within the focus region, so we must check
             if distance_to_m < no_blur_region:
                 # No blur
@@ -206,9 +204,6 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x,middle_in_focus_y, 
             # Check if we should fade to blurry so that there is not an abrupt transition
             elif distance_to_m < in_focus_radius:
                 blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
-            else:
-                # Completely blurred
-                blur_amount = 1.0
             
             # Set the blur_amount for 4 pixels of the same distance from the center of the in-focus region
             if x > 0:

@@ -35,8 +35,7 @@ tiltshift(__global __read_only uint* in_values,
           int w, int h, 
           int buf_w, int buf_h, 
           const int halo,
-          float sat, float con, bool last_pass,
-          int focus_m, int focus_r) {
+          float sat, float con, bool last_pass) {
 
     // Global position of output pixel
     const int x = get_global_id(0);
