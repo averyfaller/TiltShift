@@ -44,11 +44,16 @@ def saturation(p, value):
     Pr = 0.299
     Pg = 0.587
     Pb= 0.114
-    P = np.sqrt(p[0]*p[0]*Pr + p[1]*p[1]*Pg + p[2]*p[2]*Pb)
 
-    red_v = truncate(P+(p[0]-P)*value)
-    green_v = truncate(P+(p[1]-P)*value)
-    blue_v = truncate(P+(p[2]-P)*value)
+    red = int(p[0])
+    green = int(p[1])
+    blue = int(p[2])
+
+    P = np.sqrt(red*red*Pr + green*green*Pg + blue*blue*Pb)
+
+    red_v = truncate(P+(red-P)*value)
+    green_v = truncate(P+(green-P)*value)
+    blue_v = truncate(P+(blue-P)*value)
 
 
     return [red_v, green_v, blue_v]
@@ -80,7 +85,7 @@ def tiltshift(input_image, output_image, buf, blur_mask,
               w, h, 
               buf_w, buf_h, halo, 
               l_w, l_h,
-              sat, con, last_pass,
+              sat, con, first_pass,
               g_corner_x, g_corner_y):
         
     # coordinates of the upper left corner of the buffer in image space, including halo
@@ -126,6 +131,8 @@ def tiltshift(input_image, output_image, buf, blur_mask,
             # images with size not nicely divisible by workgroup size
             if ((y < h) and (x < w)):
                 # Get blur amount using global x,y
+                
+               
                 blur_amount = blur_mask[y,x]
                 
                 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1]
@@ -137,14 +144,17 @@ def tiltshift(input_image, output_image, buf, blur_mask,
                 p6 = buf[((buf_y + 1) * buf_w) + buf_x - 1]
                 p7 = buf[((buf_y + 1) * buf_w) + buf_x]
                 p8 = buf[((buf_y + 1) * buf_w) + buf_x + 1];
+
+                if first_pass:
+                    p4 = saturation(p4, sat)
+                    p4 = contrast(p4, con)
+
         
                 # Perform boxblur
                 blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8)
                     
                 # If we're in the last pass, perform the saturation and contrast adjustments as well
-                if last_pass:
-                    blurred_pixel = saturation(blurred_pixel, sat)
-                    blurred_pixel = contrast(blurred_pixel, con)
+                
                 output_image[y, x] = blurred_pixel
 
     # Return the output of the last pass
@@ -237,7 +247,7 @@ if __name__ == '__main__':
     # Load the image and convert it to grayscale
     input_image = mpimg.imread('../MITBoathouse.png',0)
     plt.imshow(input_image)    
-    plt.show()
+    # plt.show()
     
     start_time = time.time()
     output_image = np.zeros_like(input_image)
@@ -248,18 +258,18 @@ if __name__ == '__main__':
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 3
     # Saturation - Between 0 and 1
-    sat = 0.0
+    sat = 1.3
     # Contrast - Between -255 and 255
-    con = 0.0
+    con = 20.0
     # The y-index of the center of the in-focus region
     middle_in_focus_y = 420
     # Circle in-focus region, or horizontal in-focus region
     focused_circle = True
     # The x-index of the center of the in-focus region
     # Note: this only matters for circular in-focus region
-    middle_in_focus_x = 650
+    middle_in_focus_x = 350
     # The number of pixels distance from middle_in_focus to keep in focus
-    in_focus_radius = 200
+    in_focus_radius = 300
     ######################################
     ### USER CHANGEABLE SETTINGS - END ###
     ######################################
@@ -299,10 +309,10 @@ if __name__ == '__main__':
         # We need to loop over the workgroups here, 
         # because unlike OpenCL, they are not 
         # automatically set up by Python
-        last_pass = False
-        if pass_num == num_passes - 1:
-            print "---Last Pass---"
-            last_pass = True
+        first_pass = False
+        if pass_num == 0:
+            print "---First Pass---"
+            first_pass = True
         
         # Loop over all groups and call tiltshift once per group
         for group_corner_x in range(0, global_size[0], local_size[0]):
@@ -313,7 +323,7 @@ if __name__ == '__main__':
                           width, height, 
                           buf_width, buf_height, halo, 
                           local_size[0], local_size[1],
-                          sat, con, last_pass, 
+                          sat, con, first_pass, 
                           group_corner_x, group_corner_y)
 
         # Now put the output of the last pass into the input of the next pass
@@ -323,5 +333,5 @@ if __name__ == '__main__':
     
     # Display the new image
     plt.imshow(input_image)    
-    plt.show()
-    mpimg.imsave("MITBoathouseColorTS.png", input_image)
+    # plt.show()
+    mpimg.imsave("MITBoathouseColorTS_circle.png", input_image)
