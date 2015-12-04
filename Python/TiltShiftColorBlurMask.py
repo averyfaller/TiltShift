@@ -32,7 +32,11 @@ def boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8):
     #print "--------"
     return [int(red_v), int(green_v), int(blue_v)]
     
-# Adjusts the saturation of a pixel    
+# Adjusts the saturation of a pixel 
+# 0.0 creates a black-and-white image.
+# 0.5 reduces the color saturation by half.
+# 1.0 causes no change.
+# 2.0 doubles the color saturation.
 def saturation(p, value):
     # red_v = p[0] * (1 - value) 
     # blue_v = p[1] * (1 - value) 
