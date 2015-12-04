@@ -206,7 +206,7 @@ if __name__ == '__main__':
 
     ### Circle specific settings ###
     # Circle in-focus region, or horizontal in-focus region
-    focused_circle = True
+    focused_circle = False
     # The x-index of the center of the in-focus region
     middle_in_focus_x = np.int32(650)
     ####################################
