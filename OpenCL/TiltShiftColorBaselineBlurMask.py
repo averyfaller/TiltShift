@@ -48,11 +48,13 @@ def generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
     # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
     
     # find values of y that are within the focus radius
-    focus_y_max = min(middle_in_focus + in_focus_radius, height - 1)
-    focus_y_min = max(middle_in_focus - in_focus_radius, 0)
-    
-    # Loop over y first so we can calculate the blur amount
-    # fade out 20% to blurry so that there is not an abrupt transition
+    #focus_y_max = min(middle_in_focus + in_focus_radius, height - 1)
+    #focus_y_min = max(middle_in_focus - in_focus_radius, 0)
+    #print focus_y_max
+    #print focus_y_min
+
+    # Linearly fade out the last 20% on each side to blurry,
+    # so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
     
     # Set blur amount for focus middle
@@ -60,6 +62,7 @@ def generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
     blur_row = np.zeros_like(blur_mask[0], dtype=np.float)
     blur_mask[middle_in_focus] = blur_row
     # Simulataneously set blur amount for both rows of same distance from middle
+    # Loop over y first so we can calculate the blur amount
     for y in xrange(middle_in_focus - in_focus_radius, middle_in_focus):
         # The blur amount depends on the y-value of the pixel
         distance_to_m = abs(y - middle_in_focus)
@@ -89,11 +92,8 @@ if __name__ == '__main__':
     start_time = time.time()
     
     conversion_start_time = time.time()
-    
-    #generate blur mask
-    
     # Convert the image from (h, w, 3) to (h, w), storing the RGB value into an int
-    image_combined = (input_image[...,0].astype(np.uint64) << 16) + (input_image[...,1].astype(np.uint64) << 8) + (input_image[...,2].astype(np.uint64) << 0)
+    image_combined = (input_image[...,0].astype(np.uint32) << 16) + (input_image[...,1].astype(np.uint32) << 8) + (input_image[...,2].astype(np.uint32) << 0)
     conversion_end_time = time.time()
     print image_combined.shape
     
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
-    program = cl.Program(context, open('TiltShiftColorBaseline.cl').read()).build(options=['-I', curdir])
+    program = cl.Program(context, open('TiltShiftColorBaselineBlurMask.cl').read()).build(options=['-I', curdir])
         
     buf_start_time = time.time()
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
@@ -140,18 +140,11 @@ if __name__ == '__main__':
     
     # These settings for local_size appear to work best on my computer, not entirely sure why
     # (HD Graphics 4000 [Type: GPU] Maximum work group size 512)
-    local_size = (8, 8)
+    local_size = (256, 2)
     global_size = tuple([round_up(g, l) for g, l in zip(image_combined.shape[::-1], local_size)])
 
     width = np.int32(image_combined.shape[1])
     height = np.int32(image_combined.shape[0])
-    
-    # Initialize blur mask to be all 1's (completely blurry)
-    # Note: There is one float blur amount per pixel
-    blur_mask = np.ones_like(image_combined, dtype=np.float32)
-    # Generate the blur mask
-    generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height)
-    image_combined = image_combined + (blur_mask.astype(np.uint32) << 24)
     
     # Set up a (N+2 x N+2) local memory buffer.
     # +2 for 1-pixel halo on all sides, 4 bytes for float.
@@ -161,15 +154,39 @@ if __name__ == '__main__':
     buf_height = np.int32(local_size[1] + 2)
     halo = np.int32(1)
     
+    ################################
+    ### USER CHANGEABLE SETTINGS ###
+    ################################
+    # Number of Passes - 3 passes approximates Gaussian Blur
+    num_passes = 3
+    # Saturation - Between 0 and 1
+    sat = np.float32(0.0)
+    # Contrast - Between -255 and 255
+    con = np.float32(0.0)
+    # The y-index of the center of the in-focus region
+    middle_in_focus = np.int32(600)
+    # The number of pixels to either side of the middle_in_focus to keep in focus
+    in_focus_radius = np.int32(50)
+    ####################################
+    ### END USER CHANGEABLE SETTINGS ###
+    ####################################
+        
+    # Initialize blur mask to be all 1's (completely blurry)
+    # Note: There is one float blur amount per pixel
+    blur_mask = np.ones_like(image_combined, dtype=np.float32)
+    # Generate the blur mask
+    generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height)
+    image_combined += ((255 * blur_mask).astype(np.uint32) << 24)
+
     # Send image to the device, non-blocking
+    # This needs to be run after we update the image combined with our new values
     enqueue_start_time = time.time()
     cl.enqueue_copy(queue, gpu_image_a, image_combined, is_blocking=False)
     enqueue_end_time = time.time()
     
-
     print "Image Width %s" % width
     print "Image Height %s" % height
-    
+        
     kernel_start_time = time.time()
     # We will perform 3 passes of the bux blur 
     # effect to approximate Gaussian blurring
@@ -200,7 +217,7 @@ if __name__ == '__main__':
     cl.enqueue_copy(queue, image_combined, gpu_image_a, is_blocking=True)
     dequeue_end_time = time.time()
     
-    reconversion_start_time = time.time()
+    reconversion_start_time = time.time()    
     host_image_filtered[...,0] = ((image_combined >> 16) & 0xFF)
     host_image_filtered[...,1] = ((image_combined >> 8) & 0xFF)
     host_image_filtered[...,2] = ((image_combined) & 0xFF)
@@ -219,4 +236,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(host_image_filtered)    
     plt.show()
-    mpimg.imsave("MITBoathouseColorTS.png", host_image_filtered)
+    mpimg.imsave("MITBoathouse_TiltShiftColorBaselineBlurMask.png", host_image_filtered)

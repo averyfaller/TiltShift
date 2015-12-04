@@ -92,7 +92,7 @@ if __name__ == '__main__':
     print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
-    program = cl.Program(context, open('TiltShiftColorBaseline.cl').read()).build(options=['-I', curdir])
+    program = cl.Program(context, open('TiltShiftColorBaselineBlurMask.cl').read()).build(options=['-I', curdir])
         
     buf_start_time = time.time()
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
@@ -133,6 +133,9 @@ if __name__ == '__main__':
     middle_in_focus = np.int32(600)
     # The number of pixels to either side of the middle_in_focus to keep in focus
     in_focus_radius = np.int32(50)
+    ####################################
+    ### END USER CHANGEABLE SETTINGS ###
+    ####################################
 
     print "Image Width %s" % width
     print "Image Height %s" % height
@@ -186,4 +189,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(host_image_filtered)    
     plt.show()
-    mpimg.imsave("MITBoathouseColorTS.png", host_image_filtered)
+    mpimg.imsave("MITBoathouse_TiltShiftColorOptimized.png", host_image_filtered)

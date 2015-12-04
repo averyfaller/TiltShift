@@ -3,22 +3,22 @@
 // bluramount of 1 is full blur and will weight the neighboring
 // pixels equally with the pixel that is being modified.  
 // While a bluramount of 0 will result in no blurring.
-inline uint boxblur(float blur_amount, 
-                     uchar4 p0, uchar4 p1, uchar4 p2, 
-                     uchar4 p3, uchar4 p4, uchar4 p5, 
-                     uchar4 p6, uchar4 p7, uchar4 p8) {
+inline uint boxblur(uchar4 p0, uchar4 p1, uchar4 p2, 
+                    uchar4 p3, uchar4 p4, uchar4 p5, 
+                    uchar4 p6, uchar4 p7, uchar4 p8) {
     
+    float blur_amount = (float) p4.x / 255.0;
     // Calculate the blur amount for the central and 
     // neighboring pixels
-    float self_blur_amount = (9 - (blur_amount * 8)) / 9.0;
-    float other_blur_amount = blur_amount / 9.0;
+    float self_blur_amount = (9 - (blur_amount * 8)) / 9;
+    float other_blur_amount = blur_amount / 9;
     
     // Sum a weighted average of self and others based on the blur amount
     uchar red_v = (self_blur_amount * p4.y) + (other_blur_amount * (p0.y + p1.y + p2.y + p3.y + p5.y + p6.y + p7.y + p8.y));
     uchar green_v = (self_blur_amount * p4.z) + (other_blur_amount * (p0.z + p1.z + p2.z + p3.z + p5.z + p6.z + p7.z + p8.z));
     uchar blue_v = (self_blur_amount * p4.w) + (other_blur_amount * (p0.w + p1.w + p2.w + p3.w + p5.w + p6.w + p7.w + p8.w));
         
-    uint blur = (red_v << 16) + (green_v << 8) + blue_v;
+    uint blur = (p4.x << 24) + (red_v << 16) + (green_v << 8) + blue_v;
     return blur;
 }
 
@@ -30,7 +30,7 @@ inline uint boxblur(float blur_amount,
 // this method
 __kernel void
 tiltshift(__global __read_only uint* in_values, 
-          __global __write_only uintg* out_values, 
+          __global __write_only uint* out_values, 
           __local uchar4* buf, 
           int w, int h, 
           int buf_w, int buf_h, 
@@ -59,10 +59,9 @@ tiltshift(__global __read_only uint* in_values,
     const int idx_1D = ly * get_local_size(0) + lx;
         
     int row;
+    
     // Since the kernels are in order, by loading by column per kernel, 
     // we'll actually be loading by row across kernels
-	
-	float blur_amount = 1.0;
     if (idx_1D < buf_w) {
         for (row = 0; row < buf_h; row++) {
             int tmp_x = idx_1D;
@@ -81,14 +80,13 @@ tiltshift(__global __read_only uint* in_values,
             }
              
             uint accessed = in_values[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
-            uchar4 expanded = {0, ((accessed >> 16) & 0xFF), ((accessed >> 8) & 0xFF), ((accessed) & 0xFF)};
+            uchar4 expanded = {((accessed >> 24) & 0xFF), ((accessed >> 16) & 0xFF), ((accessed >> 8) & 0xFF), ((accessed) & 0xFF)};
             buf[row * buf_w + idx_1D] = expanded;
-			blur_amount = (float)(accessed >> 24) / 256.0
         }
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
-
+        
     // Stay in bounds check is necessary due to possible 
     // images with size not nicely divisible by workgroup size
     if ((y < h) && (x < w)) {
@@ -103,7 +101,7 @@ tiltshift(__global __read_only uint* in_values,
         uchar4 p8 = buf[((buf_y + 1) * buf_w) + buf_x + 1];
                 
         // Perform boxblur
-        uint blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8);
+        uint blurred_pixel = boxblur(p0, p1, p2, p3, p4, p5, p6, p7, p8);
                     
         // If we're in the last pass, perform the saturation and contrast adjustments as well
         if (last_pass) {

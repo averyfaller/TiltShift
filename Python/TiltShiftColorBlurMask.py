@@ -249,10 +249,8 @@ if __name__ == '__main__':
     # The x-index of the center of the in-focus region
     # Note: this only matters for circular in-focus region
     middle_in_focus_x = 650
-    
     # The number of pixels distance from middle_in_focus to keep in focus
     in_focus_radius = 200
-    
     ######################################
     ### USER CHANGEABLE SETTINGS - END ###
     ######################################
