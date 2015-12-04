@@ -42,6 +42,45 @@ def round_up(global_size, group_size):
         return global_size
     return global_size + group_size - r
 
+# generates blur mask using focus middle, focus radius, and image height,
+# and stores the blur mask in the blur_mask parameter (np.array)
+def generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
+    # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
+    
+    # find values of y that are within the focus radius
+    #focus_y_max = min(middle_in_focus + in_focus_radius, height - 1)
+    #focus_y_min = max(middle_in_focus - in_focus_radius, 0)
+    #print focus_y_max
+    #print focus_y_min
+
+    # Linearly fade out the last 20% on each side to blurry,
+    # so that there is not an abrupt transition
+    no_blur_region = .8 * in_focus_radius
+    
+    # Set blur amount for focus middle
+    #blur_row = np.array([blur_mask])
+    blur_row = np.zeros_like(blur_mask[0], dtype=np.float)
+    blur_mask[middle_in_focus] = blur_row
+    # Simulataneously set blur amount for both rows of same distance from middle
+    # Loop over y first so we can calculate the blur amount
+    for y in xrange(middle_in_focus - in_focus_radius, middle_in_focus):
+        # The blur amount depends on the y-value of the pixel
+        distance_to_m = abs(y - middle_in_focus)
+        # Note: Because we are iterating over all y's in the focus region, all the y's are within
+        # the focus radius.
+        # Thus, we need only check if we should fade to blurry so that there is not an abrupt transition
+        if distance_to_m > no_blur_region:
+            # Calculate blur ammount
+            blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region) 
+        else:
+            # No blur
+            blur_amount = 0.0
+        blur_row.fill(blur_amount)
+        if y > 0:
+            blur_mask[y] = blur_row
+        if middle_in_focus + distance_to_m < height:
+            blur_mask[middle_in_focus + distance_to_m] = blur_row
+
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image
@@ -115,11 +154,6 @@ if __name__ == '__main__':
     buf_height = np.int32(local_size[1] + 2)
     halo = np.int32(1)
     
-    # Send image to the device, non-blocking
-    enqueue_start_time = time.time()
-    cl.enqueue_copy(queue, gpu_image_a, image_combined, is_blocking=False)
-    enqueue_end_time = time.time()
-    
     ################################
     ### USER CHANGEABLE SETTINGS ###
     ################################
@@ -136,10 +170,23 @@ if __name__ == '__main__':
     ####################################
     ### END USER CHANGEABLE SETTINGS ###
     ####################################
+        
+    # Initialize blur mask to be all 1's (completely blurry)
+    # Note: There is one float blur amount per pixel
+    blur_mask = np.ones_like(image_combined, dtype=np.float32)
+    # Generate the blur mask
+    generate_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height)
+    image_combined += ((255 * blur_mask).astype(np.uint32) << 24)
 
+    # Send image to the device, non-blocking
+    # This needs to be run after we update the image combined with our new values
+    enqueue_start_time = time.time()
+    cl.enqueue_copy(queue, gpu_image_a, image_combined, is_blocking=False)
+    enqueue_end_time = time.time()
+    
     print "Image Width %s" % width
     print "Image Height %s" % height
-    
+        
     kernel_start_time = time.time()
     # We will perform 3 passes of the bux blur 
     # effect to approximate Gaussian blurring
@@ -170,7 +217,7 @@ if __name__ == '__main__':
     cl.enqueue_copy(queue, image_combined, gpu_image_a, is_blocking=True)
     dequeue_end_time = time.time()
     
-    reconversion_start_time = time.time()
+    reconversion_start_time = time.time()    
     host_image_filtered[...,0] = ((image_combined >> 16) & 0xFF)
     host_image_filtered[...,1] = ((image_combined >> 8) & 0xFF)
     host_image_filtered[...,2] = ((image_combined) & 0xFF)
@@ -189,4 +236,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(host_image_filtered)    
     plt.show()
-    mpimg.imsave("MITBoathouse_TiltShiftColorOptimized.png", host_image_filtered)
+    mpimg.imsave("MITBoathouse_TiltShiftColorBaselineBlurMask.png", host_image_filtered)
