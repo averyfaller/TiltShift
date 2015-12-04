@@ -34,10 +34,20 @@ def boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8):
     
 # Adjusts the saturation of a pixel    
 def saturation(p, value):
-    red_v = p[0] * (1 - value) 
-    blue_v = p[1] * (1 - value) 
-    green_v = p[2] * (1 - value) 
-    return [red_v, blue_v, green_v]
+    # red_v = p[0] * (1 - value) 
+    # blue_v = p[1] * (1 - value) 
+    # green_v = p[2] * (1 - value) 
+    Pr = 0.299
+    Pg = 0.587
+    Pb= 0.114
+    P = np.sqrt(p[0]*p[0]*Pr + p[1]*p[1]*Pg + p[2]*p[2]*Pb)
+
+    red_v = truncate(P+(p[0]-P)*value)
+    green_v = truncate(P+(p[1]-P)*value)
+    blue_v = truncate(P+(p[2]-P)*value)
+
+
+    return [red_v, green_v, blue_v]
     
 # Adjusts the contrast on a pixel    
 def contrast(p, value):
