@@ -1,3 +1,37 @@
+// Ensures a pixel's value for a color is between 0 and 255
+inline uchar truncate(uchar value) {
+    if (value < 0) {
+        value = 0;
+    } else if (value > 255) {
+        value = 255;
+    }
+    return value;
+}
+
+// Adjusts the saturation of a pixel    
+inline uchar4 saturation(uchar4 p, float value) {
+    float P = (p.y * p.y) * .299 + (p.z * p.z) * .587 + (p.w * p.w) * .114;
+
+    uchar red_v = truncate(P + (p.y - P) * value);
+    uchar green_v = truncate(P + (p.z - P) * value);
+    uchar blue_v = truncate(P + (p.w - P) * value);
+
+    uchar4 new_value = {p.x, red_v, green_v, blue_v};
+    return new_value;
+}
+    
+// Adjusts the contrast on a pixel    
+inline uchar4 contrast(uchar4 p, float value) {
+    float factor = (259 * (value + 255)) / float(255 * (259 - value));
+    uchar red_v = truncate((uchar) (factor * (p.y - 128) + 128));
+    uchar green_v = truncate(factor * (p.z - 128) + 128);
+    uchar blue_v = truncate(factor * (p.w - 128) + 128);
+
+    uchar4 new_value = {p.x, red_v, green_v, blue_v};
+    return new_value;
+}
+
+
 // A method that takes in a matrix of 3x3 pixels and blurs 
 // the center pixel based on the surrounding pixels, a 
 // bluramount of 1 is full blur and will weight the neighboring
@@ -35,7 +69,7 @@ tiltshift(__global __read_only uint* in_values,
           int w, int h, 
           int buf_w, int buf_h, 
           const int halo,
-          float sat, float con, bool last_pass) {
+          float sat, float con, bool first_pass) {
 
     // Global position of output pixel
     const int x = get_global_id(0);
@@ -89,11 +123,17 @@ tiltshift(__global __read_only uint* in_values,
     // Stay in bounds check is necessary due to possible 
     // images with size not nicely divisible by workgroup size
     if ((y < h) && (x < w)) {
+        // If we're in the last pass, perform the saturation and contrast adjustments as well
+        uchar4 p4 = buf[(buf_y * buf_w) + buf_x];
+        if (first_pass) {
+            //p4 = saturation(p4, sat);
+            //p4 = contrast(p4, con);
+        }
+        
         uchar4 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1];
         uchar4 p1 = buf[((buf_y - 1) * buf_w) + buf_x];
         uchar4 p2 = buf[((buf_y - 1) * buf_w) + buf_x + 1];
         uchar4 p3 = buf[(buf_y * buf_w) + buf_x - 1];
-        uchar4 p4 = buf[(buf_y * buf_w) + buf_x];
         uchar4 p5 = buf[(buf_y * buf_w) + buf_x + 1];
         uchar4 p6 = buf[((buf_y + 1) * buf_w) + buf_x - 1];
         uchar4 p7 = buf[((buf_y + 1) * buf_w) + buf_x];
@@ -101,12 +141,7 @@ tiltshift(__global __read_only uint* in_values,
                 
         // Perform boxblur
         uint blurred_pixel = boxblur(p0, p1, p2, p3, p4, p5, p6, p7, p8);
-                    
-        // If we're in the last pass, perform the saturation and contrast adjustments as well
-        if (last_pass) {
-        //    blurred_pixel = saturation(blurred_pixel, sat);
-        //    blurred_pixel = contrast(blurred_pixel, con);
-        }
+
         out_values[y * w + x] = blurred_pixel;
     }
 }

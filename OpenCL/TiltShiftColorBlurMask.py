@@ -10,30 +10,6 @@ import math
 
 # A basic, parallelized Python implementation of 
 # the Tilt-Shift effect we hope to achieve in OpenCL
-    
-# Adjusts the saturation of a pixel    
-def saturation(p, value):
-    red_v = p[0] * (1 - value) 
-    blue_v = p[1] * (1 - value) 
-    green_v = p[2] * (1 - value) 
-    return [red_v, blue_v, green_v]
-    
-# Adjusts the contrast on a pixel    
-def contrast(p, value):
-    factor = (259 * (value + 255)) / float(255 * (259 - value))
-    red = truncate(factor * (p[0] - 128) + 128)
-    green = truncate(factor * (p[1] - 128) + 128)
-    blue = truncate(factor * (p[2] - 128) + 128)
-    return [red, green, blue]
-    
-# Ensures a pixel's value for a color is between 0 and 255
-def truncate(value):
-    if value < 0:
-        value = 0
-    elif value > 255:
-        value = 255
-
-    return value
 
 # Rounds up the size to a be multiple of the group_size
 def round_up(global_size, group_size):
@@ -196,11 +172,11 @@ if __name__ == '__main__':
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 3
     # Saturation - Between 0 and 1
-    sat = np.float32(0.0)
+    sat = np.float32(1.0)
     # Contrast - Between -255 and 255
-    con = np.float32(0.0)
+    con = np.float32(1.0)
     # The y-index of the center of the in-focus region
-    middle_in_focus_y = np.int32(300)
+    middle_in_focus_y = np.int32(600)
     # The number of pixels to either side of the middle_in_focus to keep in focus
     in_focus_radius = np.int32(100)
 
@@ -246,10 +222,10 @@ if __name__ == '__main__':
         # We need to loop over the workgroups here, 
         # because unlike OpenCL, they are not 
         # automatically set up by Python
-        last_pass = np.bool_(False)
-        if pass_num == num_passes - 1:
-            print "Last Pass!"
-            last_pass = np.bool_(True)
+        first_pass = np.bool_(False)
+        if pass_num == 0:
+            print "First Pass!"
+            first_pass = np.bool_(True)
             
         # Run tilt shift over the group and store the results in host_image_tilt_shifted
         # Loop over all groups and call tiltshift once per group    
@@ -257,7 +233,7 @@ if __name__ == '__main__':
                           gpu_image_a, gpu_image_b, local_memory, 
                           width, height, 
                           buf_width, buf_height, halo,
-                          sat, con, last_pass)
+                          sat, con, first_pass)
 
         # Now put the output of the last pass into the input of the next pass
         gpu_image_a, gpu_image_b = gpu_image_b, gpu_image_a

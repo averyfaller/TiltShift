@@ -55,7 +55,6 @@ def saturation(p, value):
     green_v = truncate(P+(green-P)*value)
     blue_v = truncate(P+(blue-P)*value)
 
-
     return [red_v, green_v, blue_v]
     
 # Adjusts the contrast on a pixel    
