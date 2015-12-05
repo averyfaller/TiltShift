@@ -95,9 +95,9 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image
-    input_image = mpimg.imread('../MITBoathouse.png',0)
+    input_image = mpimg.imread('../NY.JPG',0)
     plt.imshow(input_image)    
-    plt.show()
+    # plt.show()
     
     # Start the clock
     start_time = time.time()
@@ -176,15 +176,15 @@ if __name__ == '__main__':
     # Contrast - Between -255 and 255
     con = np.float32(20.0)
     # The y-index of the center of the in-focus region
-    middle_in_focus_y = np.int32(600)
+    middle_in_focus_y = np.int32(300)
     # The number of pixels to either side of the middle_in_focus to keep in focus
-    in_focus_radius = np.int32(100)
+    in_focus_radius = np.int32(45)
 
     ### Circle specific settings ###
     # Circle in-focus region, or horizontal in-focus region
     focused_circle = False
     # The x-index of the center of the in-focus region
-    middle_in_focus_x = np.int32(650)
+    middle_in_focus_x = np.int32(400)
     ####################################
     ### END USER CHANGEABLE SETTINGS ###
     ####################################
@@ -261,4 +261,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(host_image_filtered)    
     plt.show()
-    mpimg.imsave("MITBoathouse_TiltShiftColorBaselineBlurMask.png", host_image_filtered)
+    mpimg.imsave("NY_HorizontalBackgroungBlur.png", host_image_filtered)

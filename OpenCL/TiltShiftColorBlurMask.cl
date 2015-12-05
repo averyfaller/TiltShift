@@ -134,7 +134,7 @@ tiltshift(__global __read_only uint* in_values,
         if (pass_num == 0) {
             //uchar4 p4_tmp = saturation(p4_new, sat);
             //printf("%d,%d,%d\n",p4.y,p4.z,p4.w);
-            p4 = contrast(p4_new, con);
+            //p4 = contrast(p4_new, con);
             //printf("%d,%d,%d\n",p4.y,p4.z,p4.w); 
         } else {
             p4 = p4_new;
