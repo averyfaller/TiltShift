@@ -86,8 +86,8 @@ def invert(p, value):
 
     return [red, green, blue]
 
-def temperature(p,value):
-    
+#Increases the warmth or coolness of a pixel
+def temperature(p,value): 
     red = p[0]
     green = p[1]
     blue = p[2]
@@ -98,6 +98,28 @@ def temperature(p,value):
         blue = truncate(blue+20)
 
     return [red, green, blue]
+
+#If the pixel is above value it becomes black, otherwise white
+def threshold(p,value,apply):
+    if apply:
+    
+        pixel_av = (p[0] + p[1] + p[2])/3.0
+        
+        if pixel_av>value:
+            red = 255
+            green = 255
+            blue = 255
+        else:
+            red = 0
+            green = 0
+            blue = 0
+    else:
+        red = p[0]
+        green = p[1]
+        blue = p[2]
+
+    return [red, green, blue]
+
     
 # Ensures a pixel's value for a color is between 0 and 255
 def truncate(value):
@@ -182,11 +204,13 @@ def tiltshift(input_image, output_image, buf, blur_mask,
                 p8 = buf[((buf_y + 1) * buf_w) + buf_x + 1];
 
                 if first_pass:
-                    p4 = saturation(p4, sat)
-                    p4 = contrast(p4, con)
                     p4 = brightness(p4,bright)
+                    p4 = saturation(p4, sat)
                     p4 = invert(p4, inv)
                     p4 = temperature(p4,temp)
+                    p4 = threshold(p4,thresh,apply_thresh)
+                    p4 = contrast(p4, con)
+
         
                 # Perform boxblur
                 blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8)
@@ -295,16 +319,20 @@ if __name__ == '__main__':
     ################################
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 3
-    # Saturation - Between 0 and 2
-    sat = 1.0
+    # Saturation - Between 0 and 2, 1.0 does not produce any effect
+    sat = 0.2
     # Contrast - Between 0 and 50
-    con = 0.0
+    con = 20.0
     # Brightness - Between -100 and 100
     bright = 0.0
     # Invert - True or False
     inv =  False
     # Temperature - 0 is default, -1 for cooling and 1 for warming
     temp = -1
+    #Threshold - Between 0 and 255
+    thresh = 100
+    apply_thresh = False
+
     # The y-index of the center of the in-focus region
     middle_in_focus_y = 420
     # Circle in-focus region, or horizontal in-focus region
@@ -381,4 +409,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(input_image)    
     # plt.show()
-    mpimg.imsave("NY_cool.png", input_image)
+    mpimg.imsave("NY_filter3.png", input_image)
