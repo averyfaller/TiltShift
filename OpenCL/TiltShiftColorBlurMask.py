@@ -174,7 +174,7 @@ if __name__ == '__main__':
     # Saturation - Between 0 and 1
     sat = np.float32(1.0)
     # Contrast - Between -255 and 255
-    con = np.float32(1.0)
+    con = np.float32(20.0)
     # The y-index of the center of the in-focus region
     middle_in_focus_y = np.int32(600)
     # The number of pixels to either side of the middle_in_focus to keep in focus
@@ -222,10 +222,9 @@ if __name__ == '__main__':
         # We need to loop over the workgroups here, 
         # because unlike OpenCL, they are not 
         # automatically set up by Python
-        first_pass = np.bool_(False)
+        a_pass_num = np.int32(pass_num)
         if pass_num == 0:
             print "First Pass!"
-            first_pass = np.bool_(True)
             
         # Run tilt shift over the group and store the results in host_image_tilt_shifted
         # Loop over all groups and call tiltshift once per group    
@@ -233,7 +232,7 @@ if __name__ == '__main__':
                           gpu_image_a, gpu_image_b, local_memory, 
                           width, height, 
                           buf_width, buf_height, halo,
-                          sat, con, first_pass)
+                          sat, con, a_pass_num)
 
         # Now put the output of the last pass into the input of the next pass
         gpu_image_a, gpu_image_b = gpu_image_b, gpu_image_a

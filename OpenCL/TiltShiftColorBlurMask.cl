@@ -22,10 +22,10 @@ inline uchar4 saturation(uchar4 p, float value) {
     
 // Adjusts the contrast on a pixel    
 inline uchar4 contrast(uchar4 p, float value) {
-    float factor = (259 * (value + 255)) / float(255 * (259 - value));
+    float factor = (259 * (value + 255)) / (float)(255 * (259 - value));
     uchar red_v = truncate((uchar) (factor * (p.y - 128) + 128));
-    uchar green_v = truncate(factor * (p.z - 128) + 128);
-    uchar blue_v = truncate(factor * (p.w - 128) + 128);
+    uchar green_v = truncate((uchar)(factor * (p.z - 128) + 128));
+    uchar blue_v = truncate((uchar)(factor * (p.w - 128) + 128));
 
     uchar4 new_value = {p.x, red_v, green_v, blue_v};
     return new_value;
@@ -69,7 +69,7 @@ tiltshift(__global __read_only uint* in_values,
           int w, int h, 
           int buf_w, int buf_h, 
           const int halo,
-          float sat, float con, bool first_pass) {
+          float sat, float con, int pass_num) {
 
     // Global position of output pixel
     const int x = get_global_id(0);
@@ -124,10 +124,20 @@ tiltshift(__global __read_only uint* in_values,
     // images with size not nicely divisible by workgroup size
     if ((y < h) && (x < w)) {
         // If we're in the last pass, perform the saturation and contrast adjustments as well
-        uchar4 p4 = buf[(buf_y * buf_w) + buf_x];
-        if (first_pass) {
-            //p4 = saturation(p4, sat);
-            //p4 = contrast(p4, con);
+        uchar4 p4_new = buf[(buf_y * buf_w) + buf_x];
+        
+        if ((y == 0) && (x==0)) {
+            printf("%d\n",pass_num);
+        }
+        
+        uchar4 p4;
+        if (pass_num == 0) {
+            //uchar4 p4_tmp = saturation(p4_new, sat);
+            //printf("%d,%d,%d\n",p4.y,p4.z,p4.w);
+            p4 = contrast(p4_new, con);
+            //printf("%d,%d,%d\n",p4.y,p4.z,p4.w); 
+        } else {
+            p4 = p4_new;
         }
         
         uchar4 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1];
