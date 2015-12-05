@@ -64,6 +64,40 @@ def contrast(p, value):
     green = truncate(factor * (p[1] - 128) + 128)
     blue = truncate(factor * (p[2] - 128) + 128)
     return [red, green, blue]
+
+# Adjusts the brightness on a pixel    
+def brightness(p,value):
+    red = truncate(p[0] + value)
+    green = truncate(p[1] + value)
+    blue = truncate(p[2]+ value)
+
+    return [red, green, blue]
+
+#Inverts the colors, producing the same image that would be found in a film negative
+def invert(p, value):
+    if value == True:
+        red = truncate(255 - p[0])
+        green = truncate(255- p[1])
+        blue = truncate(255-p[2])
+    else:
+        red = int(p[0])
+        green = int(p[1])
+        blue = int(p[2])
+
+    return [red, green, blue]
+
+def temperature(p,value):
+    
+    red = p[0]
+    green = p[1]
+    blue = p[2]
+
+    if value==1:
+        red = truncate(red+20)
+    elif value ==-1:
+        blue = truncate(blue+20)
+
+    return [red, green, blue]
     
 # Ensures a pixel's value for a color is between 0 and 255
 def truncate(value):
@@ -73,6 +107,9 @@ def truncate(value):
         value = 255
 
     return value
+
+
+
 
 # Applies the tilt-shift effect onto an image (grayscale for now)
 # g_corner_x, and g_corner_y are needed in this Python 
@@ -147,7 +184,9 @@ def tiltshift(input_image, output_image, buf, blur_mask,
                 if first_pass:
                     p4 = saturation(p4, sat)
                     p4 = contrast(p4, con)
-
+                    p4 = brightness(p4,bright)
+                    p4 = invert(p4, inv)
+                    p4 = temperature(p4,temp)
         
                 # Perform boxblur
                 blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8)
@@ -244,7 +283,7 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image and convert it to grayscale
-    input_image = mpimg.imread('../MITBoathouse.png',0)
+    input_image = mpimg.imread('../NY.JPG',0)
     plt.imshow(input_image)    
     # plt.show()
     
@@ -256,10 +295,16 @@ if __name__ == '__main__':
     ################################
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 3
-    # Saturation - Between 0 and 1
-    sat = 1.3
-    # Contrast - Between -255 and 255
-    con = 20.0
+    # Saturation - Between 0 and 2
+    sat = 1.0
+    # Contrast - Between 0 and 50
+    con = 0.0
+    # Brightness - Between -100 and 100
+    bright = 0.0
+    # Invert - True or False
+    inv =  False
+    # Temperature - 0 is default, -1 for cooling and 1 for warming
+    temp = -1
     # The y-index of the center of the in-focus region
     middle_in_focus_y = 420
     # Circle in-focus region, or horizontal in-focus region
@@ -300,6 +345,9 @@ if __name__ == '__main__':
         generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
     else:
         generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
+
+    #turn off blur
+    blur_mask = np.zeros(input_image.shape[:2], dtype=np.float)
     
     # We will perform 3 passes of the bux blur 
     # effect to approximate Gaussian blurring
@@ -333,4 +381,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(input_image)    
     # plt.show()
-    mpimg.imsave("MITBoathouseColorTS_circle.png", input_image)
+    mpimg.imsave("NY_cool.png", input_image)
