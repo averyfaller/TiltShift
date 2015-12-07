@@ -324,6 +324,7 @@ if __name__ == '__main__':
     parser.add_argument('-r','--radius',help='Radius of focus region', required=False)
     parser.add_argument('-l','--circle',help='Focus Region Shape (0 -> horizontal, 1 -> circle)', required=False)
     parser.add_argument('-m','--blur_mask',help='Blur mask file name', required=False)
+    parser.add_argument('-f','--tilt_shift',help='Tilt Shift (0 -> Tilt Shift, 1 -> No Tilt Shift', required=False)
 
 #==============================================================================
 #     Parse Command Line Args
@@ -340,10 +341,14 @@ if __name__ == '__main__':
     width = input_image.shape[1]
     height = input_image.shape[0]
 
-    start_time = time.time()
-    output_image = np.zeros_like(input_image)
     # Output image file name
     out_filename = args.output if args.output is not None else None
+
+    # Start the clock
+    start_time = time.time()
+    output_image = np.zeros_like(input_image)
+
+
 
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = int(args.n_passes) if args.n_passes is not None else 3
@@ -395,14 +400,27 @@ if __name__ == '__main__':
         parser.error('Radius of focus region must be positive')
     # Accept the file name storing the blur mask
     # Note: There is one float blur amount per pixel
-    generate_blur_mask = True
-    if args.blur_mask is not None:
-        blur_mask = mpimg.imread(args.blur_mask,0)
-        generate_blur_mask = False
 
-    else:
+    # Whether or not Tilt Shift is enabled
+    ts = True
+    if args.ts is not None and args.ts == '1':
+        ts = False
+    # If Tilt Shift is enabled
+    if ts:
         # Initialize blur mask to be all 1's (completely blurry)
-        blur_mask = np.ones(input_image.shape[:2], dtype=np.float)
+        # Note: There is one float blur amount per pixel
+        generate_blur_mask = True
+        if args.blur_mask is not None:
+            blur_mask = mpimg.imread(args.blur_mask,0)
+            generate_blur_mask = False
+
+        else:
+            # Initialize blur mask to be all 1's (completely blurry)
+            blur_mask = np.ones(input_image.shape[:2], dtype=np.float)
+    else:
+        # No blurring
+        blur_mask = np.zeros_like(input_image.shape[:2], dtype=np.float32)
+
     if blur_mask.shape != input_image.shape[:2]:
         parser.error('The specified blur mask\'s shape did not match the input image\'s shape')
 #==============================================================================
@@ -428,7 +446,7 @@ if __name__ == '__main__':
 
 
     # Generate the blur mask
-    if generate_blur_mask:
+    if ts and generate_blur_mask:
         if focused_circle:
             generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
         else:
@@ -464,9 +482,12 @@ if __name__ == '__main__':
     end_time = time.time()
     print "Took %s seconds to run %s passes" % (end_time - start_time, num_passes)
 
-    # Display the new image
+
     if out_filename is not None:
+        # Save image
         mpimg.imsave(out_filename, input_image)
     else:
+        # Display the new image
+        plt.imshow(input_image)
         plt.show()
 
