@@ -172,7 +172,7 @@ if __name__ == '__main__':
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 5
     # Saturation - Between 0 and 3
-    sat = np.float32(100.0)
+    sat = np.float32(2.0)
     # Contrast - Between -255 and 255
     con = np.float32(20.0)
     

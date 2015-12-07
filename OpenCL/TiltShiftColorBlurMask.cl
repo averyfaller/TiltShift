@@ -11,7 +11,6 @@ inline uchar truncate(int value) {
 
 // Adjusts the saturation of a pixel    
 inline uchar4 saturation(uchar4 p, float value) {
-    
     float P = sqrt((p.y * p.y * .299) + (p.z * p.z * .587) + (p.w * p.w * .114));
         
     uchar red_v = truncate(P + ((p.y - P) * value));
@@ -22,12 +21,12 @@ inline uchar4 saturation(uchar4 p, float value) {
     return new_value;
 }
     
-// Adjusts the contrast on a pixel    
+// Adjusts the contrast of a pixel    
 inline uchar4 contrast(uchar4 p, float value) {
-    float factor = (259 * (value + 255)) / (float)(255 * (259 - value));
-    uchar red_v = truncate((uchar) (factor * (p.y - 128) + 128));
-    uchar green_v = truncate((uchar)(factor * (p.z - 128) + 128));
-    uchar blue_v = truncate((uchar)(factor * (p.w - 128) + 128));
+    float factor = (259 * (value + 255.0)) / (255 * (259.0 - value));
+    uchar red_v = truncate(factor * (p.y - 128) + 128);
+    uchar green_v = truncate(factor * (p.z - 128) + 128);
+    uchar blue_v = truncate(factor * (p.w - 128) + 128);
 
     uchar4 new_value = {p.x, red_v, green_v, blue_v};
     return new_value;
@@ -117,13 +116,13 @@ tiltshift(__global __read_only uint* in_values,
             uint accessed = in_values[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
             uchar4 expanded = {((accessed >> 24) & 0xFF), ((accessed >> 16) & 0xFF), ((accessed >> 8) & 0xFF), ((accessed) & 0xFF)};
             
+            // If we're in the first pass, perform the saturation, contrast, etc. adjustments
             if (pass_num == 0) {
                 expanded = saturation(expanded, sat);
-                if ((y == 0) && (x==0)) {
-                    printf("%d,%d,%d\n",expanded.y,expanded.z,expanded.w);
-                }
-                //p4 = contrast(p4, con, ((y == 0) && (x==0)));
-                //printf("%d,%d,%d\n",p4.y,p4.z,p4.w); 
+                expanded = contrast(expanded, con);
+                //if ((y == 0) && (x==0)) {
+                //    printf("%d,%d,%d\n",expanded.y,expanded.z,expanded.w);
+                //}
             }
             
             buf[row * buf_w + idx_1D] = expanded;
@@ -135,20 +134,11 @@ tiltshift(__global __read_only uint* in_values,
     // Stay in bounds check is necessary due to possible 
     // images with size not nicely divisible by workgroup size
     if ((y < h) && (x < w)) {
-        // If we're in the last pass, perform the saturation and contrast adjustments as well
-        uchar4 p4 = buf[(buf_y * buf_w) + buf_x];
-        
-        if ((y == 0) && (x==0)) {
-            printf("%d\n",pass_num);
-            printf("%d,%d,%d\n",p4.y,p4.z,p4.w);
-        }
-        
-        
-        
         uchar4 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1];
         uchar4 p1 = buf[((buf_y - 1) * buf_w) + buf_x];
         uchar4 p2 = buf[((buf_y - 1) * buf_w) + buf_x + 1];
         uchar4 p3 = buf[(buf_y * buf_w) + buf_x - 1];
+        uchar4 p4 = buf[(buf_y * buf_w) + buf_x];
         uchar4 p5 = buf[(buf_y * buf_w) + buf_x + 1];
         uchar4 p6 = buf[((buf_y + 1) * buf_w) + buf_x - 1];
         uchar4 p7 = buf[((buf_y + 1) * buf_w) + buf_x];
@@ -156,12 +146,6 @@ tiltshift(__global __read_only uint* in_values,
                 
         // Perform boxblur
         uint blurred_pixel = boxblur(p0, p1, p2, p3, p4, p5, p6, p7, p8);
-        
-        if ((y == 0) && (x==0)) {
-            printf("Performing box blur %d,%d,%d\n",p4.y,p4.z,p4.w);
-            printf("Finished pixel %d,%d,%d\n", ((blurred_pixel >> 16) & 0xFF), ((blurred_pixel >> 8) & 0xFF), ((blurred_pixel) & 0xFF));
-        }
-
         out_values[y * w + x] = blurred_pixel;
     }
 }
