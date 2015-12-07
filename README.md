@@ -14,7 +14,7 @@
 In this project, we provide code to perform image manipulations, including Box Blur, as well as Saturation and Contrast adjustments.
 Taken together, these effects can be combined to produce images which appear to be Tilt Shifted.
 
-We provide code to perform these effects in both pure Python and OpenCL, which runs on GPUs.
+We provide code to perform these effects in both pure Python (which in can be found in the Python/ folder) and OpenCL (OpenCL/), which can be run on computers with GPUs.  In the OpenCL folder, you will find two implementations, a baseline implementation (OpenCL/ImageFilters.py) and an optimized implementation (OpenCL/ImageFiltersOptimized.py).
 
 ## How to use the library (from the UNIX command line):
 Note: For this example we will run the program OpenCL/ImageFilters.py to filter the NY.jpg image
@@ -60,7 +60,7 @@ X coord of center of focus region
 Y coord of center of focus region
 
 ### Examples:
-#### Tilt Shift with circular focus region using 4 passes of box blur and with all other default settings
-    python ./ImageFilters.py -i ./Input/NY.jpg -f 2 -n 4
+#### Circular Tilt Shift using 4 passes of box blur
+    python ./ImageFilters.py -i ../Input/NY.jpg -f 2 -n 4
 #### Increased contrast, saturation and warm the temperature
     python ./ImageFilters.py -i ../Input/NY.jpg -c 20 -s 2.0 -t 50
