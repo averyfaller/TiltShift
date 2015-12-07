@@ -72,6 +72,26 @@ inline uchar4 invert(uchar4 p, bool value) {
 }
 
 
+// If the pixel is above value it becomes black, otherwise white
+inline uchar4 threshold(uchar4 p, float value) {
+    uchar4 new_value = p;
+    if (value > 0) {
+        float pixel_avg = (p.y + p.z + p.w) / 3.0;
+        
+        if (pixel_avg > value) {
+            new_value.y = 255;
+            new_value.z = 255;
+            new_value.w = 255;
+        } else {
+            new_value.y = 0;
+            new_value.z = 0;
+            new_value.w = 0;
+        }
+        return new_value;
+    }
+    return new_value;
+}
+
 
 // A method that takes in a matrix of 3x3 pixels and blurs 
 // the center pixel based on the surrounding pixels, a 
@@ -110,7 +130,7 @@ tiltshift(__global __read_only uint* in_values,
           int w, int h, 
           int buf_w, int buf_h, 
           const int halo,
-          float bright, float sat, float con, float temp, bool inv, 
+          float bright, float sat, float con, float temp, bool inv, float thresh,
           int pass_num) {
 
     // Global position of output pixel
@@ -164,11 +184,7 @@ tiltshift(__global __read_only uint* in_values,
                 expanded = contrast(expanded, con);
                 expanded = temperature(expanded, temp);
                 expanded = invert(expanded, inv);
-                
-
-                //if ((y == 0) && (x==0)) {
-                //    printf("%d,%d,%d\n",expanded.y,expanded.z,expanded.w);
-                //}
+                expanded = threshold(expanded, thresh);
             }
             
             buf[row * buf_w + idx_1D] = expanded;

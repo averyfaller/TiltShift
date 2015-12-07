@@ -179,8 +179,8 @@ if __name__ == '__main__':
     temp = np.float32(-30.0)
     # Invert - True or False
     inv = np.bool_(False)
-
-    
+    #Threshold - Between 0 and 255, -1 for no threshold
+    thresh = np.float32(-1)
     
     #### Tilt-Shift Settings ####
     # The y-index of the center of the in-focus region
@@ -240,7 +240,7 @@ if __name__ == '__main__':
                           gpu_image_a, gpu_image_b, local_memory, 
                           width, height, 
                           buf_width, buf_height, halo,
-                          bright, sat, con, temp, inv, 
+                          bright, sat, con, temp, inv, thresh,
                           a_pass_num)
 
         # Now put the output of the last pass into the input of the next pass
