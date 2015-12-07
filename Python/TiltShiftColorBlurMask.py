@@ -5,34 +5,35 @@ from skimage import color
 from cython.parallel import prange
 import time
 import math
+import argparse
 
-# A basic, parallelized Python implementation of 
+# A basic, parallelized Python implementation of
 # the Tilt-Shift effect we hope to achieve in OpenCL
 
-# A method that takes in a matrix of 3x3 pixels and blurs 
-# the center pixel based on the surrounding pixels, a 
+# A method that takes in a matrix of 3x3 pixels and blurs
+# the center pixel based on the surrounding pixels, a
 # bluramount of 1 is full blur and will weight the neighboring
-# pixels equally with the pixel that is being modified.  
+# pixels equally with the pixel that is being modified.
 # While a bluramount of 0 will result in no blurring.
 def boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8):
-    # Calculate the blur amount for the central and 
+    # Calculate the blur amount for the central and
     # neighboring pixels
     self_blur_amount = (9 - (blur_amount * 8)) / 9.0
     other_blur_amount = blur_amount / 9.0
-    
+
     # Sum a weighted average of self and others based on the blur amount
     #print "--------"
     #print 0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0]
 
-    red_v = (self_blur_amount * p4[0]) + (other_blur_amount * (0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0])) 
-    green_v = (self_blur_amount * p4[1]) + (other_blur_amount * (0 + p0[1] + p1[1] + p2[1] + p3[1] + p5[1] + p6[1] + p7[1] + p8[1])) 
+    red_v = (self_blur_amount * p4[0]) + (other_blur_amount * (0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0]))
+    green_v = (self_blur_amount * p4[1]) + (other_blur_amount * (0 + p0[1] + p1[1] + p2[1] + p3[1] + p5[1] + p6[1] + p7[1] + p8[1]))
     blue_v = (self_blur_amount * p4[2]) + (other_blur_amount * (0 + p0[2] + p1[2] + p2[2] + p3[2] + p5[2] + p6[2] + p7[2] + p8[2]))
     #print "Original %s" % p4
     #print "New %s" % [int(red_v), int(blue_v), int(green_v)]
     #print "--------"
     return [int(red_v), int(green_v), int(blue_v)]
-    
-# Adjusts the brightness on a pixel    
+
+# Adjusts the brightness on a pixel
 def brightness(p,value):
     red = truncate(p[0] + value)
     green = truncate(p[1] + value)
@@ -40,15 +41,15 @@ def brightness(p,value):
 
     return [red, green, blue]
 
-# Adjusts the saturation of a pixel 
+# Adjusts the saturation of a pixel
 # 0.0 creates a black-and-white image.
 # 0.5 reduces the color saturation by half.
 # 1.0 causes no change.
 # 2.0 doubles the color saturation.
 def saturation(p, value):
-    # red_v = p[0] * (1 - value) 
-    # blue_v = p[1] * (1 - value) 
-    # green_v = p[2] * (1 - value) 
+    # red_v = p[0] * (1 - value)
+    # blue_v = p[1] * (1 - value)
+    # green_v = p[2] * (1 - value)
     Pr = 0.299
     Pg = 0.587
     Pb= 0.114
@@ -64,8 +65,8 @@ def saturation(p, value):
     blue_v = truncate(P+(blue-P)*value)
 
     return [red_v, green_v, blue_v]
-    
-# Adjusts the contrast on a pixel    
+
+# Adjusts the contrast on a pixel
 def contrast(p, value):
     factor = (259 * (value + 255)) / float(255 * (259 - value))
     red = truncate(factor * (p[0] - 128) + 128)
@@ -74,7 +75,9 @@ def contrast(p, value):
     return [red, green, blue]
 
 #Increases the warmth or coolness of a pixel
-def temperature(p,value): 
+def temperature(p,value):
+    red = p[0]
+    blue = p[2]
     if value > 0:
         red = truncate(p[0] + value)
     elif value < 0:
@@ -98,9 +101,9 @@ def invert(p, value):
 #If the pixel is above value it becomes black, otherwise white
 def threshold(p,value,apply):
     if apply:
-    
+
         pixel_av = (p[0] + p[1] + p[2])/3.0
-        
+
         if pixel_av>value:
             red = 255
             green = 255
@@ -116,7 +119,7 @@ def threshold(p,value,apply):
 
     return [red, green, blue]
 
-    
+
 # Ensures a pixel's value for a color is between 0 and 255
 def truncate(value):
     if value < 0:
@@ -130,19 +133,19 @@ def truncate(value):
 
 
 # Applies the tilt-shift effect onto an image (grayscale for now)
-# g_corner_x, and g_corner_y are needed in this Python 
-# implementation since we don't have thread methods to get our 
+# g_corner_x, and g_corner_y are needed in this Python
+# implementation since we don't have thread methods to get our
 # position.  Here they store the top left corner of the group.
-# All of the work for a workgroup happens in one thread in 
+# All of the work for a workgroup happens in one thread in
 # this method
 def tiltshift(input_image, output_image, buf, blur_mask,
-              w, h, 
-              buf_w, buf_h, halo, 
+              w, h,
+              buf_w, buf_h, halo,
               l_w, l_h,
               bright, sat, con, temp, inv,
               first_pass,
               g_corner_x, g_corner_y):
-        
+
     # coordinates of the upper left corner of the buffer in image space, including halo
     buf_corner_x = g_corner_x - halo
     buf_corner_y = g_corner_y - halo
@@ -153,41 +156,41 @@ def tiltshift(input_image, output_image, buf, blur_mask,
         for col in range(0, buf_w):
             tmp_x = col
             tmp_y = row
-            
+
             # Now ensure the pixel we are about to load is inside the image's boundaries
             if (buf_corner_x + tmp_x < 0) :
                 tmp_x += 1
             elif (buf_corner_x + tmp_x >= w):
                 tmp_x -= 1
-            
+
             if (buf_corner_y + tmp_y < 0):
                 tmp_y += 1
             elif (buf_corner_y + tmp_y >= h):
                 tmp_y -= 1
-                
+
             # Check you are within halo of global
             if ((buf_corner_y + tmp_y < h) and (buf_corner_x + tmp_x < w)):
                 #input_image[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
                 buf[row * buf_w + col] = input_image[buf_corner_y + tmp_y, buf_corner_x + tmp_x];
-    # Loop over y first so we can calculate the blur amount    
+    # Loop over y first so we can calculate the blur amount
     for ly in range(0, l_h):
         # Initialize Global y Position
         y = ly + g_corner_y
         # Initialize Buffer y Position
         buf_y = ly + halo;
-        
+
         for lx in range(0, l_w):
             # Initialize Global x Position
             x = lx + g_corner_x
             # Initialize Buffer x Position
             buf_x = lx + halo;
-    
-            # Stay in bounds check is necessary due to possible 
+
+            # Stay in bounds check is necessary due to possible
             # images with size not nicely divisible by workgroup size
             if ((y < h) and (x < w)):
                 # Get blur amount using global x,y
                 blur_amount = blur_mask[y,x]
-                
+
                 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1]
                 p1 = buf[((buf_y - 1) * buf_w) + buf_x]
                 p2 = buf[((buf_y - 1) * buf_w) + buf_x + 1]
@@ -203,15 +206,15 @@ def tiltshift(input_image, output_image, buf, blur_mask,
                     p4 = saturation(p4, sat)
                     p4 = temperature(p4,temp)
                     p4 = invert(p4, inv)
-                    
+
                     p4 = threshold(p4,thresh,apply_thresh)
-                    p4 = contrast(p4, con)                    
-        
+                    p4 = contrast(p4, con)
+
                 # Perform boxblur
                 blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8)
-                    
+
                 # If we're in the last pass, perform the saturation and contrast adjustments as well
-                
+
                 output_image[y, x] = blurred_pixel
 
     # Return the output of the last pass
@@ -223,17 +226,17 @@ def round_up(global_size, group_size):
     if r == 0:
         return global_size
     return global_size + group_size - r
-    
-    
+
+
 # generates horizontal blur mask using focus middle, focus radius, and image height,
 # and stores the blur mask in the blur_mask parameter (np.array)
 def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
     # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
-    
+
     # Loop over y first so we can calculate the blur amount
     # fade out 20% to blurry so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
-    
+
     # Set blur amount for focus middle
     #blur_row = np.array([blur_mask])
     blur_row = np.zeros_like(blur_mask[0], dtype=np.float)
@@ -247,7 +250,7 @@ def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, h
         # Thus, we need only check if we should fade to blurry so that there is not an abrupt transition
         if distance_to_m > no_blur_region:
             # Calculate blur ammount
-            blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region) 
+            blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
         else:
             # No blur
             blur_amount = 0.0
@@ -256,27 +259,27 @@ def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, h
             blur_mask[y] = blur_row
         if middle_in_focus + distance_to_m < height:
             blur_mask[middle_in_focus + distance_to_m] = blur_row
-            
-# Generates a circular horizontal blur mask using the x and y coordinates of the focus middle, 
-# focus radius, and image height, and stores the blur mask in the blur_mask parameter (np.array)            
+
+# Generates a circular horizontal blur mask using the x and y coordinates of the focus middle,
+# focus radius, and image height, and stores the blur mask in the blur_mask parameter (np.array)
 def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height):
     # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
 
     # Fade out 20% to blurry so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
-    
+
     # Set blur amount (no blur) for center of in-focus region
     #blur_mask[middle_in_focus_y, middle_in_focus_x] = 0.0
-    
+
     # Loop over x and y first so we can calculate the blur amount
     for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + 1):
         for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + 1):
-            
+
             # The blur amount depends on the euclidean distance between the pixel and focus center
             x_distance_to_m = abs(x - middle_in_focus_x)
             y_distance_to_m = abs(y - middle_in_focus_y)
             distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
-            
+
             blur_amount = 1.0
             # Note: Not all values we iterate over are within the focus region, so we must check
             if distance_to_m < no_blur_region:
@@ -285,7 +288,7 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
             # Check if we should fade to blurry so that there is not an abrupt transition
             elif distance_to_m < in_focus_radius:
                 blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
-            
+
             # Set the blur_amount for 4 pixels of the same distance from the center of the in-focus region
             if x > 0:
                 if y > 0:
@@ -297,110 +300,172 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
                     blur_mask[y, middle_in_focus_x + x_distance_to_m] = blur_amount
                 if middle_in_focus_y + y_distance_to_m < height:
                     blur_mask[middle_in_focus_y + y_distance_to_m, middle_in_focus_x + x_distance_to_m] = blur_amount
-            
-    
+
+
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
+
+#==============================================================================
+#     Setup for parsing Command Line Args
+#==============================================================================
+    parser = argparse.ArgumentParser(description='Image Effects (in pure Python)')
+    parser.add_argument('-i','--input', help='Input image file name',required=True)
+    parser.add_argument('-o','--output',help='Output image file name (required to save new image)', required=False)
+    parser.add_argument('-n','--n_passes', help='Number of box blur passes',required=False)
+    parser.add_argument('-b','--bright',help='Brightness Level (between -100.0 and 100.0)', required=False)
+    parser.add_argument('-s','--sat',help='Saturation Level (between 0.0 and 2.0)', required=False)
+    parser.add_argument('-c','--con',help='Contrast Level (between 0 and 50)', required=False)
+    parser.add_argument('-t','--temp',help='Temperature Level (between -255 and 255)', required=False)
+    parser.add_argument('-v','--inv',help='Invert Colors (0 -> Normal, 1 -> Inverted)', required=False)
+    parser.add_argument('-z','--thresh',help='Threshold Level (between 0 and 255, default is None)', required=False)
+    parser.add_argument('-w','--inverse',help='Invert Colors (0 -> Normal, 1 -> Inverted)', required=False)
+    parser.add_argument('-x','--x_center',help='X coord of center of focus region', required=False)
+    parser.add_argument('-y','--y_center',help='Y coord of center of focus region', required=False)
+    parser.add_argument('-r','--radius',help='Radius of focus region', required=False)
+    parser.add_argument('-l','--circle',help='Focus Region Shape (0 -> horizontal, 1 -> circle)', required=False)
+    parser.add_argument('-m','--blur_mask',help='Blur mask file name', required=False)
+
+#==============================================================================
+#     Parse Command Line Args
+#==============================================================================
+
+    args = parser.parse_args()
+
     # Load the image and convert it to grayscale
-    input_image = mpimg.imread('../Input/NY.JPG',0)
-    
+    try:
+        input_image = mpimg.imread(args.input,0)
+    except (OSError, IOError) as e:
+        parser.error('Valid input image file name required')
+
+    width = input_image.shape[1]
+    height = input_image.shape[0]
     start_time = time.time()
     output_image = np.zeros_like(input_image)
+    # Output image file name
+    out_filename = args.output if args.output is not None else None
 
-    ################################
-    ### USER CHANGEABLE SETTINGS ###
-    ################################
     # Number of Passes - 3 passes approximates Gaussian Blur
-    num_passes = 3
+    num_passes = int(args.n_passes) if args.n_passes is not None else 3
+    if num_passes < 0:
+        parser.error('Number of passes must be greater than 0')
     # Brightness - Between -100 and 100
-    bright = 0.0
+    bright = float(args.bright) if args.bright is not None else 0.0
+    if bright > 100 or bright < -100:
+        parser.error('Brightness must be between -100 and 100')
     # Saturation - Between 0 and 2, 1.0 does not produce any effect
-    sat = 0.2
+    sat = float(args.sat) if args.sat is not None else 0.2
+    if sat > 2 or bright < 0:
+        parser.error('Saturation must be between 0 and 2')
     # Contrast - Between 0 and 50
-    con = 20.0
+    con = float(args.con) if args.con is not None else 20.0
+    if con > 50 or con < 0:
+        parser.error('Contrast must be between 0 and 50')
     # Temperature - Between -255 and 255
-    temp = -1
+    temp = int(args.temp) if args.temp is not None else -1
+    if temp > 255 or temp < -255:
+        parser.error('Temperature must be between -255 and 255')
     # Invert - True or False
-    inv =  False
+    inv = True if args.inverse == '1' else False
+    if inv is False and args.inverse not in ['1', None]:
+        parser.error('Inverse must be 0 or 1')
     #Threshold - Between 0 and 255
     thresh = 100
     apply_thresh = False
+    if args.thresh is not None:
+        thresh = int(args.thresh)
+        apply_thresh = True
+        if thresh > 255 or thresh < 0:
+            parser.error('Threshold must be between 0 and 255')
 
     # The y-index of the center of the in-focus region
-    middle_in_focus_y = 420
+    middle_in_focus_y = int(args.y_center) if args.y_center is not None else height/2
+    if middle_in_focus_y > height or middle_in_focus_y < 0:
+        parser.error('Y coord of center of focus region must be between 0 and {} for this image'.format(height-1))
     # Circle in-focus region, or horizontal in-focus region
-    focused_circle = True
+    focused_circle = True if args.circle == '1' else False
     # The x-index of the center of the in-focus region
     # Note: this only matters for circular in-focus region
-    middle_in_focus_x = 350
+    middle_in_focus_x = int(args.x_center) if args.x_center is not None else width/2
+    if middle_in_focus_x > width or middle_in_focus_x < 0:
+        parser.error('X coord of center of focus region must be between 0 and {} for this image'.format(width-1))
     # The number of pixels distance from middle_in_focus to keep in focus
-    in_focus_radius = 300
-    ######################################
-    ### USER CHANGEABLE SETTINGS - END ###
-    ######################################
+    in_focus_radius = int(args.radius) if args.radius is not None else min(width, height)/2
+    if in_focus_radius < 0:
+        parser.error('Radius of focus region must be positive')
+    # Accept the file name storing the blur mask
+    # Note: There is one float blur amount per pixel
+    generate_blur_mask = True
+    if args.blur_mask is not None:
+        blur_mask = mpimg.imread(args.blur_mask,0)
+        generate_blur_mask = False
+
+    else:
+        # Initialize blur mask to be all 1's (completely blurry)
+        blur_mask = np.ones(input_image.shape[:2], dtype=np.float)
+    if blur_mask.shape != input_image.shape[:2]:
+        parser.error('The specified blur mask\'s shape did not match the input image\'s shape')
+#==============================================================================
+#     End Parsing Command Line Args
+#==============================================================================
+
 
     local_size = (256, 256)  # This doesn't really affect speed for the Python implementation
     # We need to add [1:] because the first element in this list is the number of colors in RGB, namely 3
     global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1][1:], local_size)])
-    width = input_image.shape[1]
-    height = input_image.shape[0]
-    
+
     # Set up a (N+2 x N+2) local memory buffer.
     # +2 for 1-pixel halo on all sides
     local_memory = [[]] * (local_size[0] + 2) * (local_size[1] + 2) #np.zeros((local_size[0] + 2) * (local_size[1] + 2))
-    
+
     # Each work group will have its own private buffer.
     buf_width = local_size[0] + 2
     buf_height = local_size[1] + 2
     halo = 1
-    
+
     print "Image Width %s" % width
     print "Image Height %s" % height
-    
-    
-    # Initialize blur mask to be all 1's (completely blurry)
-    # Note: There is one float blur amount per pixel
-    blur_mask = np.ones(input_image.shape[:2], dtype=np.float)
-    # Generate the blur mask
-    if focused_circle:
-        generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
-    else:
-        generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
 
-    #turn off blur
-    blur_mask = np.zeros(input_image.shape[:2], dtype=np.float)
-    
-    # We will perform 3 passes of the bux blur 
+
+    # Generate the blur mask
+    if generate_blur_mask:
+        if focused_circle:
+            generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+        else:
+            generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
+
+    # We will perform 3 passes of the bux blur
     # effect to approximate Gaussian blurring
     for pass_num in range(num_passes):
         print "In iteration %s of %s" % (pass_num + 1, num_passes)
-        # We need to loop over the workgroups here, 
-        # because unlike OpenCL, they are not 
+        # We need to loop over the workgroups here,
+        # because unlike OpenCL, they are not
         # automatically set up by Python
         first_pass = False
         if pass_num == 0:
             print "---First Pass---"
             first_pass = True
-        
+
         # Loop over all groups and call tiltshift once per group
         for group_corner_x in range(0, global_size[0], local_size[0]):
             for group_corner_y in range(0, global_size[1], local_size[1]):
                 #print "GROUP CONRER %s %s" % (group_corner_x, group_corner_y)
                 # Run tilt shift over the group and store the results in host_image_tilt_shifted
                 tiltshift(input_image, output_image, local_memory, blur_mask,
-                          width, height, 
-                          buf_width, buf_height, halo, 
+                          width, height,
+                          buf_width, buf_height, halo,
                           local_size[0], local_size[1],
                           bright, sat, con, temp, inv,
-                          first_pass, 
+                          first_pass,
                           group_corner_x, group_corner_y)
 
         # Now put the output of the last pass into the input of the next pass
         input_image = output_image
     end_time = time.time()
-    print "Took %s seconds to run %s passes" % (end_time - start_time, num_passes)   
-    
+    print "Took %s seconds to run %s passes" % (end_time - start_time, num_passes)
+
     # Display the new image
-    plt.imshow(input_image)    
-    # plt.show()
-    mpimg.imsave("NY_filter3.png", input_image)
+    if out_filename is not None:
+        mpimg.imsave(out_filename, input_image)
+    else:
+        plt.show()
+
