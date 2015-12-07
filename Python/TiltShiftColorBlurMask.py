@@ -189,8 +189,6 @@ def tiltshift(input_image, output_image, buf, blur_mask,
             # images with size not nicely divisible by workgroup size
             if ((y < h) and (x < w)):
                 # Get blur amount using global x,y
-                
-               
                 blur_amount = blur_mask[y,x]
                 
                 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1]
