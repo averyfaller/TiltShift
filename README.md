@@ -12,46 +12,44 @@ We provide code to perform these effects in both pure Python and OpenCL, which r
 
 ## How to use the library (from the UNIX command line):
 Note: For this example we will run the program OpenCL/ImageFilters.py to filter the NY.jpg image
-
-## Pseudo - Man page
-### NAME:
-./ImageFilters.py -- filters image
-### Synopsis:
-./ImageFilters.py [-bcfilmnorstwxyz] [input_file ...]
-### Description
+### Name: 
+    ./ImageFilters.py -- filters image
+### Synopsis: 
+    ./ImageFilters.py [-bcfilmnorstwxyz] [input_file ...]
+### Description: 
 Given an image file as input, the program modifies the image using a specified filter.
 
 #### The following options are available:
-#### -b , --bright
+##### -b , --bright
 Brightness Level (between -100.0 and 100.0)
-#### -c, --con
+##### -c, --con
 Contrast Level (between 0 and 50)
-#### -f, --tilt_shift
+##### -f, --tilt_shift
 Tilt Shift (0 -> Tilt Shift, 1 -> No Tilt Shift
-#### -i, --input
+##### -i, --input
  Input image file name
-#### -l, --circle
+##### -l, --circle
 Focus Region Shape (0 -> horizontal, 1 -> circle)
-#### -m, --blur_mask
+##### -m, --blur_mask
 Blur mask file name
-#### -n --n_passes
+##### -n --n_passes
 Number of box blur passes
-#### -o, --output
+##### -o, --output
 Output image file name (required to save new image)
-#### -r, --radius
+##### -r, --radius
 Radius of focus region
-#### -s, --sat
+##### -s, --sat
 Saturation Level (between 0.0 and 2.0)
-#### -t, --temp
+##### -t, --temp
 Temperature Level (between -255 and 255)'
-#### -w, --inverse
+##### -w, --inverse
 Invert Colors (0 -> Normal, 1 -> Inverted)
-#### -x, --x_center
+##### -x, --x_center
 X coord of center of focus region
-#### -y, --y_center
+##### -y, --y_center
 Y coord of center of focus region
-#### -z, --thresh
+##### -z, --thresh
 Threshold Level (between 0 and 255, default is None)
 
-    ### Example: Tilt Shift with circular focus region using 4 passes of box blur and with all other default settings
-        ./ImageFilters.py -i ./Input/NY.jpg -l 1 -n 4
+### Example: Tilt Shift with circular focus region using 4 passes of box blur and with all other default settings
+    ./ImageFilters.py -i ./Input/NY.jpg -l 1 -n 4
