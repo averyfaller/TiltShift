@@ -8,8 +8,7 @@ from cython.parallel import prange
 import time
 import math
 
-# A basic, parallelized Python implementation of 
-# the Tilt-Shift effect we hope to achieve in OpenCL
+# A baseline OpenCL implementation
 
 # Rounds up the size to a be multiple of the group_size
 def round_up(global_size, group_size):
@@ -140,7 +139,7 @@ if __name__ == '__main__':
     print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
-    program = cl.Program(context, open('TiltShiftColorBlurMask.cl').read()).build(options=['-I', curdir])
+    program = cl.Program(context, open('TiltShiftColor.cl').read()).build(options=['-I', curdir])
         
     buf_start_time = time.time()
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
@@ -270,4 +269,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(host_image_filtered)    
     plt.show()
-    mpimg.imsave("NY_FifthPass.png", host_image_filtered)
+    mpimg.imsave("NY_Baseline.png", host_image_filtered)
