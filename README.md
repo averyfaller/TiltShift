@@ -1,9 +1,15 @@
-# Image Filters
+# Image Filters with OpenCL
 
-#### A library for applying filters to images.  Included filters:
-    ADD IMAGE FILTER LIST
+#### A library for applying filters to images.
+1. Tilt Shift Effect (circular or horizontal focus region)
+2. Saturation Adjustment
+3. Contrast Adjustment
+4. Brightness Adjustment
+5. Threshold Filtering
+6. Temperature Adjustment
+7. Color Inversion
+8. Blurring
 
-Tilt Shift Image Effect with OpenCL.
 
 In this project, we provide code to perform image manipulations, including Box Blur, as well as Saturation and Contrast adjustments.
 Taken together, these effects can be combined to produce images which appear to be Tilt Shifted.
