@@ -45,12 +45,12 @@ Invert Colors (0 -> Normal, 1 -> Inverted)
 ##### -z, --thresh
 Threshold Level (between 0 and 255, default is None)
 
-#### Focus options:
+#### Focus-specific parameters:
 ##### -f, --focus
-Focus (0 -> In Focus, 1 -> Blurred, 2 -> Circular Tilt Shift, 3 -> Horizontal Tilt Shift
+Focus (0 -> In Focus, 1 -> Consistent Blur, 2 -> Circular Tilt Shift, 3 -> Horizontal Tilt Shift)
 ##### -m, --blur_mask
 Blur mask file name
-##### -n --n_passes
+##### -n, --n_passes
 Number of box blur passes
 ##### -r, --radius
 Radius of focus region
@@ -59,6 +59,8 @@ X coord of center of focus region
 ##### -y, --y_center
 Y coord of center of focus region
 
-
-### Example: Tilt Shift with circular focus region using 4 passes of box blur and with all other default settings
+### Examples:
+#### Tilt Shift with circular focus region using 4 passes of box blur and with all other default settings
     python ./ImageFilters.py -i ./Input/NY.jpg -f 2 -n 4
+#### Increased contrast, saturation and warm the temperature
+    python ./ImageFilters.py -i ../Input/NY.jpg -c 20 -s 2.0 -t 50

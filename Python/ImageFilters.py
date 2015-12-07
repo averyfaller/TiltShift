@@ -314,7 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('-y','--y_center',help='Y coord of center of focus region', required=False)
     parser.add_argument('-r','--radius',help='Radius of focus region', required=False)
     parser.add_argument('-m','--blur_mask',help='Blur mask file name', required=False)
-    parser.add_argument('-f','--focus',help='Focus (0 -> In Focus, 1 -> Blurred, 2 -> Circular Tilt Shift, 3 -> Horizontal Tilt Shift', required=False)
+    parser.add_argument('-f','--focus',help='Focus (0 -> In Focus, 1 -> Consistent Blur, 2 -> Circular Tilt Shift, 3 -> Horizontal Tilt Shift', required=False)
 
 #==============================================================================
 #     Parse Command Line Args
