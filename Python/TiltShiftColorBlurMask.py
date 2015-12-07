@@ -73,6 +73,15 @@ def contrast(p, value):
     blue = truncate(factor * (p[2] - 128) + 128)
     return [red, green, blue]
 
+#Increases the warmth or coolness of a pixel
+def temperature(p,value): 
+    if value > 0:
+        red = truncate(p[0] + value)
+    elif value < 0:
+        blue = truncate(p[2] + value)
+
+    return [red, p[1], blue]
+
 #Inverts the colors, producing the same image that would be found in a film negative
 def invert(p, value):
     if value:
@@ -83,19 +92,6 @@ def invert(p, value):
         red = int(p[0])
         green = int(p[1])
         blue = int(p[2])
-
-    return [red, green, blue]
-
-#Increases the warmth or coolness of a pixel
-def temperature(p,value): 
-    red = p[0]
-    green = p[1]
-    blue = p[2]
-
-    if value==1:
-        red = truncate(red+20)
-    elif value ==-1:
-        blue = truncate(blue+20)
 
     return [red, green, blue]
 
@@ -143,7 +139,8 @@ def tiltshift(input_image, output_image, buf, blur_mask,
               w, h, 
               buf_w, buf_h, halo, 
               l_w, l_h,
-              sat, con, first_pass,
+              bright, sat, con, temp, inv,
+              first_pass,
               g_corner_x, g_corner_y):
         
     # coordinates of the upper left corner of the buffer in image space, including halo
@@ -204,11 +201,11 @@ def tiltshift(input_image, output_image, buf, blur_mask,
                 if first_pass:
                     p4 = brightness(p4,bright)
                     p4 = saturation(p4, sat)
-                    p4 = invert(p4, inv)
                     p4 = temperature(p4,temp)
+                    p4 = invert(p4, inv)
+                    
                     p4 = threshold(p4,thresh,apply_thresh)
-                    p4 = contrast(p4, con)
-
+                    p4 = contrast(p4, con)                    
         
                 # Perform boxblur
                 blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8)
@@ -306,8 +303,6 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
 if __name__ == '__main__':
     # Load the image and convert it to grayscale
     input_image = mpimg.imread('../NY.JPG',0)
-    plt.imshow(input_image)    
-    # plt.show()
     
     start_time = time.time()
     output_image = np.zeros_like(input_image)
@@ -323,10 +318,10 @@ if __name__ == '__main__':
     sat = 0.2
     # Contrast - Between 0 and 50
     con = 20.0
+    # Temperature - Between -255 and 255
+    temp = -1
     # Invert - True or False
     inv =  False
-    # Temperature - 0 is default, -1 for cooling and 1 for warming
-    temp = -1
     #Threshold - Between 0 and 255
     thresh = 100
     apply_thresh = False
@@ -396,7 +391,8 @@ if __name__ == '__main__':
                           width, height, 
                           buf_width, buf_height, halo, 
                           local_size[0], local_size[1],
-                          sat, con, first_pass, 
+                          bright, sat, con, temp, inv,
+                          first_pass, 
                           group_corner_x, group_corner_y)
 
         # Now put the output of the last pass into the input of the next pass

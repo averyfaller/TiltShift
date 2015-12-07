@@ -175,6 +175,8 @@ if __name__ == '__main__':
     sat = np.float32(2.0)
     # Contrast - Between -255 and 255
     con = np.float32(50.0)
+    # Temperature - Between -255 and 255
+    temp = np.float32(-30.0)
     # Invert - True or False
     inv = np.bool_(False)
 
@@ -238,7 +240,7 @@ if __name__ == '__main__':
                           gpu_image_a, gpu_image_b, local_memory, 
                           width, height, 
                           buf_width, buf_height, halo,
-                          bright, sat, con, inv, 
+                          bright, sat, con, temp, inv, 
                           a_pass_num)
 
         # Now put the output of the last pass into the input of the next pass

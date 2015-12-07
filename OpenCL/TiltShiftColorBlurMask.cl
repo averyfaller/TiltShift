@@ -42,6 +42,22 @@ inline uchar4 contrast(uchar4 p, float value) {
     return new_value;
 }
 
+
+// Increases the warmth or coolness of a pixel
+inline uchar4 temperature(uchar4 p, float value) {
+    uchar4 new_value = p;
+    
+    if (value > 0) {
+        uchar red = truncate(p.y + value);
+        new_value.y = red;
+    } else if (value < 0) {
+        uchar blue = truncate(p.w + value);
+        new_value.w = blue;
+    }
+
+    return new_value;        
+}            
+
 // Inverts the colors, producing the same image that would be found in a film negative
 inline uchar4 invert(uchar4 p, bool value) {
     if (value) {
@@ -94,7 +110,7 @@ tiltshift(__global __read_only uint* in_values,
           int w, int h, 
           int buf_w, int buf_h, 
           const int halo,
-          float bright, float sat, float con, bool inv, 
+          float bright, float sat, float con, float temp, bool inv, 
           int pass_num) {
 
     // Global position of output pixel
@@ -146,7 +162,9 @@ tiltshift(__global __read_only uint* in_values,
                 expanded = brightness(expanded, bright);
                 expanded = saturation(expanded, sat);
                 expanded = contrast(expanded, con);
+                expanded = temperature(expanded, temp);
                 expanded = invert(expanded, inv);
+                
 
                 //if ((y == 0) && (x==0)) {
                 //    printf("%d,%d,%d\n",expanded.y,expanded.z,expanded.w);
