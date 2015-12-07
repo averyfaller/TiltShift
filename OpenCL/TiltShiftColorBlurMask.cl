@@ -9,6 +9,16 @@ inline uchar truncate(int value) {
     return toreturn;
 }
 
+// Adjusts the brightness on a pixel    
+inline uchar4 brightness(uchar4 p, float value) {
+    uchar red = truncate(p.y + value);
+    uchar green = truncate(p.z + value);
+    uchar blue = truncate(p.w + value);
+
+    uchar4 new_value = {p.x, red, green, blue};
+    return new_value;
+}
+
 // Adjusts the saturation of a pixel    
 inline uchar4 saturation(uchar4 p, float value) {
     float P = sqrt((p.y * p.y * .299) + (p.z * p.z * .587) + (p.w * p.w * .114));
@@ -31,6 +41,20 @@ inline uchar4 contrast(uchar4 p, float value) {
     uchar4 new_value = {p.x, red_v, green_v, blue_v};
     return new_value;
 }
+
+// Inverts the colors, producing the same image that would be found in a film negative
+inline uchar4 invert(uchar4 p, bool value) {
+    if (value) {
+        uchar red = truncate(255 - p.y);
+        uchar green = truncate(255 - p.z);
+        uchar blue = truncate(255 - p.w);
+        uchar4 new_value = {p.x, red, green, blue};
+        return new_value;
+    } else {
+        return p;
+    }
+}
+
 
 
 // A method that takes in a matrix of 3x3 pixels and blurs 
@@ -70,7 +94,8 @@ tiltshift(__global __read_only uint* in_values,
           int w, int h, 
           int buf_w, int buf_h, 
           const int halo,
-          float sat, float con, int pass_num) {
+          float bright, float sat, float con, bool inv, 
+          int pass_num) {
 
     // Global position of output pixel
     const int x = get_global_id(0);
@@ -118,8 +143,11 @@ tiltshift(__global __read_only uint* in_values,
             
             // If we're in the first pass, perform the saturation, contrast, etc. adjustments
             if (pass_num == 0) {
+                expanded = brightness(expanded, bright);
                 expanded = saturation(expanded, sat);
                 expanded = contrast(expanded, con);
+                expanded = invert(expanded, inv);
+
                 //if ((y == 0) && (x==0)) {
                 //    printf("%d,%d,%d\n",expanded.y,expanded.z,expanded.w);
                 //}

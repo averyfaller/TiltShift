@@ -96,8 +96,6 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
 if __name__ == '__main__':
     # Load the image
     input_image = mpimg.imread('../NY.JPG',0)
-    plt.imshow(input_image)    
-    # plt.show()
     
     # Start the clock
     start_time = time.time()
@@ -171,10 +169,15 @@ if __name__ == '__main__':
     ### General settings ###
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 5
-    # Saturation - Between 0 and 3
+    # Brightness - Between -100 and 100
+    bright = np.float32(10.0)
+    # Saturation - Between 0.0 and 5.0
     sat = np.float32(2.0)
     # Contrast - Between -255 and 255
-    con = np.float32(20.0)
+    con = np.float32(50.0)
+    # Invert - True or False
+    inv = np.bool_(False)
+
     
     
     #### Tilt-Shift Settings ####
@@ -235,7 +238,8 @@ if __name__ == '__main__':
                           gpu_image_a, gpu_image_b, local_memory, 
                           width, height, 
                           buf_width, buf_height, halo,
-                          sat, con, a_pass_num)
+                          bright, sat, con, inv, 
+                          a_pass_num)
 
         # Now put the output of the last pass into the input of the next pass
         gpu_image_a, gpu_image_b = gpu_image_b, gpu_image_a

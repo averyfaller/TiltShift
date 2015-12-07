@@ -32,6 +32,14 @@ def boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8):
     #print "--------"
     return [int(red_v), int(green_v), int(blue_v)]
     
+# Adjusts the brightness on a pixel    
+def brightness(p,value):
+    red = truncate(p[0] + value)
+    green = truncate(p[1] + value)
+    blue = truncate(p[2]+ value)
+
+    return [red, green, blue]
+
 # Adjusts the saturation of a pixel 
 # 0.0 creates a black-and-white image.
 # 0.5 reduces the color saturation by half.
@@ -65,20 +73,12 @@ def contrast(p, value):
     blue = truncate(factor * (p[2] - 128) + 128)
     return [red, green, blue]
 
-# Adjusts the brightness on a pixel    
-def brightness(p,value):
-    red = truncate(p[0] + value)
-    green = truncate(p[1] + value)
-    blue = truncate(p[2]+ value)
-
-    return [red, green, blue]
-
 #Inverts the colors, producing the same image that would be found in a film negative
 def invert(p, value):
-    if value == True:
+    if value:
         red = truncate(255 - p[0])
-        green = truncate(255- p[1])
-        blue = truncate(255-p[2])
+        green = truncate(255 - p[1])
+        blue = truncate(255 - p[2])
     else:
         red = int(p[0])
         green = int(p[1])
@@ -317,12 +317,12 @@ if __name__ == '__main__':
     ################################
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = 3
+    # Brightness - Between -100 and 100
+    bright = 0.0
     # Saturation - Between 0 and 2, 1.0 does not produce any effect
     sat = 0.2
     # Contrast - Between 0 and 50
     con = 20.0
-    # Brightness - Between -100 and 100
-    bright = 0.0
     # Invert - True or False
     inv =  False
     # Temperature - 0 is default, -1 for cooling and 1 for warming
