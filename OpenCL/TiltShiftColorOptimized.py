@@ -58,9 +58,6 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
     # Fade out 20% to blurry so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
     
-    # Set blur amount (no blur) for center of in-focus region
-    #blur_mask[middle_in_focus_y, middle_in_focus_x] = 0.0
-    
     # Loop over x and y first so we can calculate the blur amount
     for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + 1):
         for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + 1):
@@ -139,9 +136,9 @@ if __name__ == '__main__':
     print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
-    program = cl.Program(context, open('TiltShiftColor.cl').read()).build(options=['-I', curdir])
+    ts_program = cl.Program(context, open('TiltShiftColor.cl').read()).build(options=['-I', curdir])
         
-    buf_start_time = time.time()
+    buf_start_time = time.time()    
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
     gpu_image_b = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
     buf_end_time = time.time()
@@ -180,16 +177,17 @@ if __name__ == '__main__':
     inv = np.bool_(False)
     #Threshold - Between 0 and 255, -1 for no threshold
     thresh = np.float32(-1)
+    ts = True
     
     #### Tilt-Shift Settings ####
     # The y-index of the center of the in-focus region
-    middle_in_focus_y = np.int32(280)
+    middle_in_focus_y = np.int32(450)
     # The number of pixels to either side of the middle_in_focus to keep in focus
-    in_focus_radius = np.int32(200)
+    in_focus_radius = np.int32(50)
 
     # Circle specific settings
     # Circle in-focus region, or horizontal in-focus region
-    focused_circle = True
+    focused_circle = False
     # The x-index of the center of the in-focus region
     middle_in_focus_x = np.int32(370)
     ####################################
@@ -198,20 +196,34 @@ if __name__ == '__main__':
     quartertime = time.time()
     print "First quarter time %s" % (quartertime - start_time)
 
-    
-        
-    # Initialize blur mask to be all 1's (completely blurry)
-    # Note: There is one float blur amount per pixel
-    blur_mask = np.ones_like(image_combined, dtype=np.float32)
-    # Generate the blur mask
-    if focused_circle:
-        print "Genearting a circular blur mask around (%s, %s)" % (middle_in_focus_x, middle_in_focus_y)
-        # Circular Blur Mask
-        generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+    # If Tilt Shift is enabled
+    if ts:
+        # Initialize blur mask to be all 1's (completely blurry)
+        # Note: There is one float blur amount per pixel
+        blur_mask = np.ones_like(image_combined, dtype=np.float32)
+        # Generate the blur mask
+        if focused_circle:
+            # Circular Blur Mask
+            print "Genearting a circular blur mask around (%s, %s)" % (middle_in_focus_x, middle_in_focus_y)
+            blur_mask_output = cl.Buffer(context, cl.mem_flags.READ_WRITE, blur_mask.size * 32)
+            circle_blur_program = cl.Program(context, open('CircularBlurMask.cl').read()).build(options=['-I', curdir])
+            cl.enqueue_copy(queue, blur_mask_output, blur_mask, is_blocking=False)
+            circle_blur_program.blurmask(queue, global_size, local_size,
+                          blur_mask_output,
+                          width, height, 
+                          buf_width, buf_height, halo,
+                          middle_in_focus_x, middle_in_focus_y, in_focus_radius)
+            
+            cl.enqueue_copy(queue, blur_mask, blur_mask_output, is_blocking=True)
+            
+            #generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+        else:
+            # Horizontal Blur Mask
+            print "Genearting a horizontal blur mask %s" % middle_in_focus_y
+            generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
     else:
-        print "Genearting a horizontal blur mask %s" % middle_in_focus_y
-        # Horizontal Blur Mask
-        generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
+        # No blurring
+        blur_mask = np.zeros_like(image_combined, dtype=np.float32)
     
     # Set the 4th parameter in the input image to be the blur amount for that pixel
     image_combined += ((255 * blur_mask).astype(np.uint32) << 24)
@@ -225,10 +237,8 @@ if __name__ == '__main__':
     print "Image Width %s" % width
     print "Image Height %s" % height
         
-        
     halftime = time.time()
     print "Second quarter time %s" % (halftime - quartertime)
-
     
     kernel_start_time = time.time()
     # We will perform 3 passes of the bux blur 
@@ -244,7 +254,7 @@ if __name__ == '__main__':
             
         # Run tilt shift over the group and store the results in host_image_tilt_shifted
         # Loop over all groups and call tiltshift once per group    
-        program.tiltshift(queue, global_size, local_size,
+        ts_program.tiltshift(queue, global_size, local_size,
                           gpu_image_a, gpu_image_b, local_memory, 
                           width, height, 
                           buf_width, buf_height, halo,
@@ -279,4 +289,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(host_image_filtered)    
     plt.show()
-    mpimg.imsave("NY_Baseline.png", host_image_filtered)
+    mpimg.imsave("NY_Optimized.png", host_image_filtered)

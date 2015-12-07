@@ -58,9 +58,6 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
     # Fade out 20% to blurry so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
     
-    # Set blur amount (no blur) for center of in-focus region
-    #blur_mask[middle_in_focus_y, middle_in_focus_x] = 0.0
-    
     # Loop over x and y first so we can calculate the blur amount
     for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + 1):
         for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + 1):
@@ -180,6 +177,8 @@ if __name__ == '__main__':
     inv = np.bool_(False)
     #Threshold - Between 0 and 255, -1 for no threshold
     thresh = np.float32(-1)
+    ts = True
+    
     
     #### Tilt-Shift Settings ####
     # The y-index of the center of the in-focus region
@@ -196,18 +195,23 @@ if __name__ == '__main__':
     ### END USER CHANGEABLE SETTINGS ###
     ####################################
         
-    # Initialize blur mask to be all 1's (completely blurry)
-    # Note: There is one float blur amount per pixel
-    blur_mask = np.ones_like(image_combined, dtype=np.float32)
-    # Generate the blur mask
-    if focused_circle:
-        print "Genearting a circular blur mask around (%s, %s)" % (middle_in_focus_x, middle_in_focus_y)
-        # Circular Blur Mask
-        generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+    # If Tilt Shift is enabled
+    if ts:    
+        # Initialize blur mask to be all 1's (completely blurry)
+        # Note: There is one float blur amount per pixel
+        blur_mask = np.ones_like(image_combined, dtype=np.float32)
+        # Generate the blur mask
+        if focused_circle:
+            print "Genearting a circular blur mask around (%s, %s)" % (middle_in_focus_x, middle_in_focus_y)
+            # Circular Blur Mask
+            generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+        else:
+            print "Genearting a horizontal blur mask %s" % middle_in_focus_y
+            # Horizontal Blur Mask
+            generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
     else:
-        print "Genearting a horizontal blur mask %s" % middle_in_focus_y
-        # Horizontal Blur Mask
-        generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
+        # No blurring
+        blur_mask = np.zeros_like(image_combined, dtype=np.float32)
     
     # Set the 4th parameter in the input image to be the blur amount for that pixel
     image_combined += ((255 * blur_mask).astype(np.uint32) << 24)
