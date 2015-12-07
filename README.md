@@ -60,7 +60,9 @@ X coord of center of focus region
 Y coord of center of focus region
 
 ### Examples:
-#### Circular Tilt Shift using 4 passes of box blur
-    python ./ImageFilters.py -i ../Input/NY.jpg -f 2 -n 4
-#### Increased contrast, saturation and warm the temperature
+#### Circular Tilt Shift using 4 passes of box blur, increased contrast, saturation and warmth
+    python ./ImageFilters.py -i ../Input/NY.jpg -c 20 -s 2.0 -t 30 -f 2 -n 4 -r 50 -x 350 -y 430
+#### Increased contrast, saturation and warmth, no blurring
     python ./ImageFilters.py -i ../Input/NY.jpg -c 20 -s 2.0 -t 50
+#### Increased contrast and apply a cutoff threshold of 70
+    python ./ImageFilters.py -i ../Input/NY.jpg -c 20 -z 70
