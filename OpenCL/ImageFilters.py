@@ -133,7 +133,7 @@ if __name__ == '__main__':
     start_time = time.time()
     output_image = np.zeros_like(input_image)
 
-  # Number of Passes - 3 passes approximates Gaussian Blur
+    # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = np.int32(args.n_passes) if args.n_passes is not None else np.int32(3)
     if num_passes < 0:
         parser.error('Number of passes must be greater than 0')

@@ -413,7 +413,6 @@ if __name__ == '__main__':
         if args.blur_mask is not None:
             blur_mask = mpimg.imread(args.blur_mask,0)
             generate_blur_mask = False
-
         else:
             # Initialize blur mask to be all 1's (completely blurry)
             blur_mask = np.ones(input_image.shape[:2], dtype=np.float)
