@@ -96,7 +96,7 @@ inline uchar4 threshold(uchar4 p, float value) {
 // bluramount of 1 is full blur and will weight the neighboring
 // pixels equally with the pixel that is being modified.  
 // While a bluramount of 0 will result in no blurring.
-inline uint boxblur(uchar4 p0, uchar4 p1, uchar4 p2, 
+inline uchar4 boxblur(uchar4 p0, uchar4 p1, uchar4 p2, 
                     uchar4 p3, uchar4 p4, uchar4 p5, 
                     uchar4 p6, uchar4 p7, uchar4 p8) {
     
@@ -110,9 +110,9 @@ inline uint boxblur(uchar4 p0, uchar4 p1, uchar4 p2,
     uchar red_v = (self_blur_amount * p4.y) + (other_blur_amount * (p0.y + p1.y + p2.y + p3.y + p5.y + p6.y + p7.y + p8.y));
     uchar green_v = (self_blur_amount * p4.z) + (other_blur_amount * (p0.z + p1.z + p2.z + p3.z + p5.z + p6.z + p7.z + p8.z));
     uchar blue_v = (self_blur_amount * p4.w) + (other_blur_amount * (p0.w + p1.w + p2.w + p3.w + p5.w + p6.w + p7.w + p8.w));
-        
-    uint blur = (p4.x << 24) + (red_v << 16) + (green_v << 8) + blue_v;
-    return blur;
+    
+    uchar4 new_value = {p4.x, red_v, green_v, blue_v};
+    return new_value;
 }
 
 // Applies the tilt-shift effect onto an image (grayscale for now)
@@ -122,8 +122,8 @@ inline uint boxblur(uchar4 p0, uchar4 p1, uchar4 p2,
 // All of the work for a workgroup happens in one thread in 
 // this method
 __kernel void
-tiltshift(__global __read_only uint* in_values, 
-          __global __write_only uint* out_values, 
+tiltshift(__global __read_only uchar4* in_values, 
+          __global __write_only uchar4* out_values, 
           __local uchar4* buf, 
           int w, int h, 
           int buf_w, int buf_h, 
@@ -172,8 +172,8 @@ tiltshift(__global __read_only uint* in_values,
                 tmp_y--;
             }
              
-            uint accessed = in_values[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
-            uchar4 expanded = {((accessed >> 24) & 0xFF), ((accessed >> 16) & 0xFF), ((accessed >> 8) & 0xFF), ((accessed) & 0xFF)};
+            uchar4 expanded = in_values[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
+            // uchar4 expanded = {((accessed >> 24) & 0xFF), ((accessed >> 16) & 0xFF), ((accessed >> 8) & 0xFF), ((accessed) & 0xFF)};
             
             // If we're in the first pass, perform the saturation, contrast, etc. adjustments
             if (pass_num == 0) {
@@ -205,7 +205,7 @@ tiltshift(__global __read_only uint* in_values,
         uchar4 p8 = buf[((buf_y + 1) * buf_w) + buf_x + 1];
                 
         // Perform boxblur
-        uint blurred_pixel = boxblur(p0, p1, p2, p3, p4, p5, p6, p7, p8);
+        uchar4 blurred_pixel = boxblur(p0, p1, p2, p3, p4, p5, p6, p7, p8);
         out_values[y * w + x] = blurred_pixel;
     }
 }
