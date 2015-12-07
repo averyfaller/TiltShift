@@ -129,7 +129,6 @@ if __name__ == '__main__':
     # Output image file name
     out_filename = args.output if args.output is not None else None
 
-
     # Start the clock
     start_time = time.time()
     output_image = np.zeros_like(input_image)

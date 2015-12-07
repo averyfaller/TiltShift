@@ -49,58 +49,28 @@ def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, h
             blur_mask[y] = blur_row
         if middle_in_focus + distance_to_m < height:
             blur_mask[middle_in_focus + distance_to_m] = blur_row
-            
-# Generates a circular horizontal blur mask using the x and y coordinates of the focus middle, 
-# focus radius, and image height, and stores the blur mask in the blur_mask parameter (np.array)            
-def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height):
-    # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
-
-    # Fade out 20% to blurry so that there is not an abrupt transition
-    no_blur_region = .8 * in_focus_radius
-    
-    # Loop over x and y first so we can calculate the blur amount
-    for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + 1):
-        for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + 1):
-            
-            # The blur amount depends on the euclidean distance between the pixel and focus center
-            x_distance_to_m = abs(x - middle_in_focus_x)
-            y_distance_to_m = abs(y - middle_in_focus_y)
-            distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
-            
-            blur_amount = 1.0
-            # Note: Not all values we iterate over are within the focus region, so we must check
-            if distance_to_m < no_blur_region:
-                # No blur
-                blur_amount = 0.0
-            # Check if we should fade to blurry so that there is not an abrupt transition
-            elif distance_to_m < in_focus_radius:
-                blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
-            
-            # Set the blur_amount for 4 pixels of the same distance from the center of the in-focus region
-            if x > 0:
-                if y > 0:
-                    blur_mask[y, x] = blur_amount
-                if middle_in_focus_y + y_distance_to_m < height:
-                    blur_mask[middle_in_focus_y + y_distance_to_m, x] = blur_amount
-            if middle_in_focus_x + x_distance_to_m < width:
-                if y > 0:
-                    blur_mask[y, middle_in_focus_x + x_distance_to_m] = blur_amount
-                if middle_in_focus_y + y_distance_to_m < height:
-                    blur_mask[middle_in_focus_y + y_distance_to_m, middle_in_focus_x + x_distance_to_m] = blur_amount
 
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image
-    input_image = mpimg.imread('../NY.JPG',0)
+    input_image = mpimg.imread('../Input/NY.JPG',0)
     
     # Start the clock
     start_time = time.time()
+    
+    #width = np.int32(image_combined.shape[1])
+    #height = np.int32(image_combined.shape[0])
+    size = input_image[...,0].size
+    width = np.int32(input_image[...,0].shape[1])
+    height =  np.int32(input_image[...,0].shape[0])
+    
+    image_out = np.zeros(shape=(height, width, 4),dtype=np.uint8)
     
     conversion_start_time = time.time()
     # Convert the image from (h, w, 3) to (h, w), storing the RGB value into an int
     image_combined = (input_image[...,0].astype(np.uint32) << 16) + (input_image[...,1].astype(np.uint32) << 8) + (input_image[...,2].astype(np.uint32) << 0)
     conversion_end_time = time.time()
-    print image_combined.shape
+    #print image_combined.size
     
     # Make the placeholders for the output image and output combined
     #output_combined = np.zeros_like(image_combined)
@@ -138,18 +108,13 @@ if __name__ == '__main__':
     curdir = os.path.dirname(os.path.realpath(__file__))
     ts_program = cl.Program(context, open('TiltShiftColor.cl').read()).build(options=['-I', curdir])
         
-    buf_start_time = time.time()    
-    gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
-    gpu_image_b = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
-    buf_end_time = time.time()
+    gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, size * 32)
+    gpu_image_b = cl.Buffer(context, cl.mem_flags.READ_WRITE, size * 32)
     
     # These settings for local_size appear to work best on my computer, not entirely sure why
     # (HD Graphics 4000 [Type: GPU] Maximum work group size 512)
     local_size = (64, 8)
-    global_size = tuple([round_up(g, l) for g, l in zip(image_combined.shape[::-1], local_size)])
-
-    width = np.int32(image_combined.shape[1])
-    height = np.int32(image_combined.shape[0])
+    global_size = tuple([round_up(g, l) for g, l in zip((width, height), local_size)])
     
     # Set up a (N+2 x N+2) local memory buffer.
     # +2 for 1-pixel halo on all sides, 4 bytes for float.
@@ -187,7 +152,7 @@ if __name__ == '__main__':
 
     # Circle specific settings
     # Circle in-focus region, or horizontal in-focus region
-    focused_circle = False
+    focused_circle = True
     # The x-index of the center of the in-focus region
     middle_in_focus_x = np.int32(370)
     ####################################
@@ -215,8 +180,6 @@ if __name__ == '__main__':
                           middle_in_focus_x, middle_in_focus_y, in_focus_radius)
             
             cl.enqueue_copy(queue, blur_mask, blur_mask_output, is_blocking=True)
-            
-            #generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
         else:
             # Horizontal Blur Mask
             print "Genearting a horizontal blur mask %s" % middle_in_focus_y
@@ -266,21 +229,17 @@ if __name__ == '__main__':
     kernel_end_time = time.time()
     
     dequeue_start_time = time.time()
-    cl.enqueue_copy(queue, image_combined, gpu_image_a, is_blocking=True)
+    cl.enqueue_copy(queue, image_out, gpu_image_a, is_blocking=True)
     dequeue_end_time = time.time()
     
-    reconversion_start_time = time.time()    
-    host_image_filtered[...,0] = ((image_combined >> 16) & 0xFF)
-    host_image_filtered[...,1] = ((image_combined >> 8) & 0xFF)
-    host_image_filtered[...,2] = ((image_combined) & 0xFF)
+    reconversion_start_time = time.time() 
+    host_image_filtered = image_out[:, :, 0:3][:,:,::-1]
     reconversion_end_time = time.time()
-    
     end_time = time.time()
     
     print "####### TIMING BREAKDOWN #######"
     print "Took %s total seconds to run %s passes" % (end_time - start_time, num_passes)  
     print "Conversion time was %s seconds" % (conversion_end_time - conversion_start_time) 
-    print "Buf creation time was %s seconds" % (buf_end_time - buf_start_time)
     print "Enqueue time was %s seconds" % (enqueue_end_time - enqueue_start_time) 
     print "Kernel time was %s seconds" % (kernel_end_time - kernel_start_time)  
     print "Dequeue time was %s seconds" % (dequeue_end_time - dequeue_start_time) 
