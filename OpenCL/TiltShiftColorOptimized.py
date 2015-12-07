@@ -91,7 +91,7 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image
-    input_image = mpimg.imread('../NY.JPG',0)
+    input_image = mpimg.imread('../Input/NY.JPG',0)
     
     # Start the clock
     start_time = time.time()
@@ -138,10 +138,8 @@ if __name__ == '__main__':
     curdir = os.path.dirname(os.path.realpath(__file__))
     ts_program = cl.Program(context, open('TiltShiftColor.cl').read()).build(options=['-I', curdir])
         
-    buf_start_time = time.time()    
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
     gpu_image_b = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
-    buf_end_time = time.time()
     
     # These settings for local_size appear to work best on my computer, not entirely sure why
     # (HD Graphics 4000 [Type: GPU] Maximum work group size 512)
@@ -187,7 +185,7 @@ if __name__ == '__main__':
 
     # Circle specific settings
     # Circle in-focus region, or horizontal in-focus region
-    focused_circle = False
+    focused_circle = True
     # The x-index of the center of the in-focus region
     middle_in_focus_x = np.int32(370)
     ####################################
@@ -280,7 +278,6 @@ if __name__ == '__main__':
     print "####### TIMING BREAKDOWN #######"
     print "Took %s total seconds to run %s passes" % (end_time - start_time, num_passes)  
     print "Conversion time was %s seconds" % (conversion_end_time - conversion_start_time) 
-    print "Buf creation time was %s seconds" % (buf_end_time - buf_start_time)
     print "Enqueue time was %s seconds" % (enqueue_end_time - enqueue_start_time) 
     print "Kernel time was %s seconds" % (kernel_end_time - kernel_start_time)  
     print "Dequeue time was %s seconds" % (dequeue_end_time - dequeue_start_time) 

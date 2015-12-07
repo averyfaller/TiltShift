@@ -302,7 +302,7 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
 # Run a Python implementation of Tilt-Shift (grayscale)
 if __name__ == '__main__':
     # Load the image and convert it to grayscale
-    input_image = mpimg.imread('../NY.JPG',0)
+    input_image = mpimg.imread('../Input/NY.JPG',0)
     
     start_time = time.time()
     output_image = np.zeros_like(input_image)
