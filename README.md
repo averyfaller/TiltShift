@@ -11,15 +11,15 @@ Taken together, these effects can be combined to produce images which appear to 
 We provide code to perform these effects in both pure Python and OpenCL, which runs on GPUs.
 
 ## How to use the library (from the UNIX command line):
-    Note: For this example we will run the program OpenCL/ImageFilters.py to filter the NY.jpg image
+Note: For this example we will run the program OpenCL/ImageFilters.py to filter the NY.jpg image
 
 ## Pseudo - Man page
 ### NAME:
-    ./ImageFilters.py -- filters image
+./ImageFilters.py -- filters image
 ### Synopsis:
-    ./ImageFilters.py [-bcfilmnorstwxyz] [input_file ...]
+./ImageFilters.py [-bcfilmnorstwxyz] [input_file ...]
 ### Description
-    Given an image file as input, the program modifies the image using a specified filter.
+Given an image file as input, the program modifies the image using a specified filter.
 
 #### The following options are available:
 #### -b , --bright
