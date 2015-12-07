@@ -7,6 +7,7 @@ from skimage import color
 from cython.parallel import prange
 import time
 import math
+import argparse
 
 # A baseline OpenCL implementation
 
@@ -88,13 +89,15 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
                 if middle_in_focus_y + y_distance_to_m < height:
                     blur_mask[middle_in_focus_y + y_distance_to_m, middle_in_focus_x + x_distance_to_m] = blur_amount
 
-# Run a Python implementation of Tilt-Shift (grayscale)
+# Run a baseline OpenCL implementation of ImageFilters
 if __name__ == '__main__':
-
+    # Start the clock
+    start_time = time.time()
+    
 #==============================================================================
 #     Setup for parsing Command Line Args
 #==============================================================================
-    parser = argparse.ArgumentParser(description='Image Effects (in pure Python)')
+    parser = argparse.ArgumentParser(description='Image Effects (in OpenCL)')
     parser.add_argument('-i','--input', help='Input image file name',required=True)
     parser.add_argument('-o','--output',help='Output image file name (required to save new image)', required=False)
     parser.add_argument('-n','--n_passes', help='Number of box blur passes',required=False)
@@ -108,30 +111,30 @@ if __name__ == '__main__':
     parser.add_argument('-x','--x_center',help='X coord of center of focus region', required=False)
     parser.add_argument('-y','--y_center',help='Y coord of center of focus region', required=False)
     parser.add_argument('-r','--radius',help='Radius of focus region', required=False)
-    parser.add_argument('-l','--circle',help='Focus Region Shape (0 -> horizontal, 1 -> circle)', required=False)
     parser.add_argument('-m','--blur_mask',help='Blur mask file name', required=False)
-
+    parser.add_argument('-f','--focus',help='Focus (0 -> In Focus, 1 -> Blurred, 2 -> Circular Tilt Shift, 3 -> Horizontal Tilt Shift', required=False)
 #==============================================================================
 #     Parse Command Line Args
 #==============================================================================
 
     args = parser.parse_args()
 
-    # Load the image and convert it to grayscale
+    # Load the image
     try:
         input_image = mpimg.imread(args.input,0)
     except (OSError, IOError) as e:
         parser.error('Valid input image file name required')
+        
+    conversion_start_time = time.time()
+    # Convert the image from (h, w, 3) to (h, w), storing the RGB value into an int
+    image_combined = (input_image[...,0].astype(np.uint32) << 16) + (input_image[...,1].astype(np.uint32) << 8) + (input_image[...,2].astype(np.uint32) << 0)
+    conversion_end_time = time.time()
 
     width = np.int32(image_combined.shape[1])
     height = np.int32(image_combined.shape[0])
 
     # Output image file name
     out_filename = args.output if args.output is not None else None
-
-    # Start the clock
-    start_time = time.time()
-    output_image = np.zeros_like(input_image)
 
     # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = np.int32(args.n_passes) if args.n_passes is not None else np.int32(3)
@@ -142,13 +145,13 @@ if __name__ == '__main__':
     if bright > 100 or bright < -100:
         parser.error('Brightness must be between -100 and 100')
     # Saturation - Between 0 and 2, 1.0 does not produce any effect
-    sat = np.float32(args.sat) if args.sat is not None else np.float32(0.2)
-    if sat > 2 or bright < 0:
-        parser.error('Saturation must be between 0 and 2')
-    # Contrast - Between 0 and 50
+    sat = np.float32(args.sat) if args.sat is not None else np.float32(1.0)
+    if sat > 5 or bright < 0:
+        parser.error('Saturation must be between 0 and 5')
+    # Contrast - Between -255 and 255
     con = np.float32(args.con) if args.con is not None else np.float32(20.0)
-    if con > 50 or con < 0:
-        parser.error('Contrast must be between 0 and 50')
+    if con > 255 or con < -255:
+        parser.error('Contrast must be between -255 and 255')
     # Temperature - Between -255 and 255
     temp = np.int32(args.temp) if args.temp is not None else np.int32(-1)
     if temp > 255 or temp < -255:
@@ -165,13 +168,19 @@ if __name__ == '__main__':
         apply_thresh = True
         if thresh > 255 or thresh < 0:
             parser.error('Threshold must be between 0 and 255')
+            
+    # Focus Type (default None)
+    # Consistent blur
+    consistent_blur = True if args.focus == '1' else False
+    # Circle in-focus region
+    focused_circle = True if args.focus == '2' else False
+    # Horizontal in-focus region
+    focused_hor = True if args.focus == '3' else False     
 
     # The y-index of the center of the in-focus region
     middle_in_focus_y = np.int32(args.y_center) if args.y_center is not None else np.int32(height/2)
     if middle_in_focus_y > height or middle_in_focus_y < 0:
         parser.error('Y coord of center of focus region must be between 0 and {} for this image'.format(height-1))
-    # Circle in-focus region, or horizontal in-focus region
-    focused_circle = np.bool_(True) if args.circle == '1' else np.bool_(False)
     # The x-index of the center of the in-focus region
     # Note: this only matters for circular in-focus region
     middle_in_focus_x = np.int32(args.x_center) if args.x_center is not None else np.int32(width/2)
@@ -184,25 +193,27 @@ if __name__ == '__main__':
     # Accept the file name storing the blur mask
     # Note: There is one float blur amount per pixel
 
-    # Whether or not Tilt Shift is enabled
-    ts = np.bool_(True)
-    if args.ts is not None and args.ts == '1':
-        ts = np.bool_(False)
     # If Tilt Shift is enabled
-    if ts:
+    if consistent_blur or focused_circle or focused_hor:
         # Initialize blur mask to be all 1's (completely blurry)
         # Note: There is one float blur amount per pixel
-        generate_blur_mask = np.bool_(True)
+        generate_blur_mask = True
         if args.blur_mask is not None:
             blur_mask = mpimg.imread(args.blur_mask,0)
-            generate_blur_mask = np.bool_(False)
-
+            generate_blur_mask = False
         else:
             # Initialize blur mask to be all 1's (completely blurry)
-            blur_mask = np.ones(input_image.shape[:2], dtype=np.float)
+            blur_mask = np.ones(input_image.shape[:2], dtype=np.float32)
+            # Generate the blur mask
+            if focused_circle:
+                print "Creating circular blur mask"
+                generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+            elif focused_hor:
+                print "Creating horizontal blur mask"
+                generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
     else:
         # No blurring
-        blur_mask = np.zeros_like(input_image.shape[:2], dtype=np.float32)
+        blur_mask = np.zeros(input_image.shape[:2], dtype=np.float32)
 
     if blur_mask.shape != input_image.shape[:2]:
         parser.error('The specified blur mask\'s shape did not match the input image\'s shape')
@@ -210,15 +221,7 @@ if __name__ == '__main__':
 #     End Parsing Command Line Args
 #==============================================================================
 
-
-    conversion_start_time = time.time()
-    # Convert the image from (h, w, 3) to (h, w), storing the RGB value into an int
-    image_combined = (input_image[...,0].astype(np.uint32) << 16) + (input_image[...,1].astype(np.uint32) << 8) + (input_image[...,2].astype(np.uint32) << 0)
-    conversion_end_time = time.time()
-    print image_combined.shape
-
-    # Make the placeholders for the output image and output combined
-    #output_combined = np.zeros_like(image_combined)
+    # Make the placeholders for the output image
     host_image_filtered = np.zeros_like(input_image)
 
     # List our platforms
@@ -251,7 +254,7 @@ if __name__ == '__main__':
     print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
-    program = cl.Program(context, open('TiltShiftColor.cl').read()).build(options=['-I', curdir])
+    program = cl.Program(context, open('ImageFilters.cl').read()).build(options=['-I', curdir])
 
     buf_start_time = time.time()
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, image_combined.size * 32)
@@ -263,8 +266,6 @@ if __name__ == '__main__':
     local_size = (256, 2)
     global_size = tuple([round_up(g, l) for g, l in zip(image_combined.shape[::-1], local_size)])
 
-
-
     # Set up a (N+2 x N+2) local memory buffer.
     # +2 for 1-pixel halo on all sides, 4 bytes for float.
     local_memory = cl.LocalMemory(4 * (local_size[0] + 2) * (local_size[1] + 2))
@@ -272,21 +273,6 @@ if __name__ == '__main__':
     buf_width = np.int32(local_size[0] + 2)
     buf_height = np.int32(local_size[1] + 2)
     halo = np.int32(1)
-
-    # If Tilt Shift is enabled
-    if ts and generate_blur_mask:
-        # Initialize blur mask to be all 1's (completely blurry)
-        # Note: There is one float blur amount per pixel
-        blur_mask = np.ones_like(image_combined, dtype=np.float32)
-        # Generate the blur mask
-        if focused_circle:
-            print "Genearting a circular blur mask around (%s, %s)" % (middle_in_focus_x, middle_in_focus_y)
-            # Circular Blur Mask
-            generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
-        else:
-            print "Genearting a horizontal blur mask %s" % middle_in_focus_y
-            # Horizontal Blur Mask
-            generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
 
     # Set the 4th parameter in the input image to be the blur amount for that pixel
     image_combined += ((255 * blur_mask).astype(np.uint32) << 24)
@@ -344,8 +330,6 @@ if __name__ == '__main__':
     print "Kernel time was %s seconds" % (kernel_end_time - kernel_start_time)
     print "Dequeue time was %s seconds" % (dequeue_end_time - dequeue_start_time)
     print "Reconversion time was %s seconds" % (reconversion_end_time - reconversion_start_time)
-
-
 
     if out_filename is not None:
         # Save image
