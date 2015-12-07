@@ -170,21 +170,21 @@ if __name__ == '__main__':
     ################################
     ### General settings ###
     # Number of Passes - 3 passes approximates Gaussian Blur
-    num_passes = 3
+    num_passes = 5
     # Saturation - Between 0 and 1
     sat = np.float32(1.0)
     # Contrast - Between -255 and 255
     con = np.float32(20.0)
     # The y-index of the center of the in-focus region
-    middle_in_focus_y = np.int32(300)
+    middle_in_focus_y = np.int32(280)
     # The number of pixels to either side of the middle_in_focus to keep in focus
-    in_focus_radius = np.int32(45)
+    in_focus_radius = np.int32(200)
 
     ### Circle specific settings ###
     # Circle in-focus region, or horizontal in-focus region
-    focused_circle = False
+    focused_circle = True
     # The x-index of the center of the in-focus region
-    middle_in_focus_x = np.int32(400)
+    middle_in_focus_x = np.int32(370)
     ####################################
     ### END USER CHANGEABLE SETTINGS ###
     ####################################
@@ -261,4 +261,4 @@ if __name__ == '__main__':
     # Display the new image
     plt.imshow(host_image_filtered)    
     plt.show()
-    mpimg.imsave("NY_HorizontalBackgroungBlur.png", host_image_filtered)
+    mpimg.imsave("NY_FifthPass.png", host_image_filtered)

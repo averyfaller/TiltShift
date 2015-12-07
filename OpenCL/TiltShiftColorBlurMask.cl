@@ -124,20 +124,17 @@ tiltshift(__global __read_only uint* in_values,
     // images with size not nicely divisible by workgroup size
     if ((y < h) && (x < w)) {
         // If we're in the last pass, perform the saturation and contrast adjustments as well
-        uchar4 p4_new = buf[(buf_y * buf_w) + buf_x];
+        uchar4 p4 = buf[(buf_y * buf_w) + buf_x];
         
         if ((y == 0) && (x==0)) {
             printf("%d\n",pass_num);
         }
         
-        uchar4 p4;
         if (pass_num == 0) {
-            //uchar4 p4_tmp = saturation(p4_new, sat);
+            p4 = saturation(p4, sat);
             //printf("%d,%d,%d\n",p4.y,p4.z,p4.w);
-            //p4 = contrast(p4_new, con);
+            //p4 = contrast(p4, con);
             //printf("%d,%d,%d\n",p4.y,p4.z,p4.w); 
-        } else {
-            p4 = p4_new;
         }
         
         uchar4 p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1];
