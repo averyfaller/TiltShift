@@ -1,0 +1,4 @@
+name: Tilt Shift
+markdown: redcarpet
+pygments: true
+baseurl: /Tiltshift # the subpath of your site, e.g. /blog
