@@ -228,7 +228,6 @@ def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, h
     # Loop over y first so we can calculate the blur amount
     # fade out 20% to blurry so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
-
     # Set blur amount for focus middle
     #blur_row = np.array([blur_mask])
     blur_row = np.zeros_like(blur_mask[0], dtype=np.float)
@@ -259,39 +258,93 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
 
     # Fade out 20% to blurry so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
-
     # Set blur amount (no blur) for center of in-focus region
     #blur_mask[middle_in_focus_y, middle_in_focus_x] = 0.0
 
+    # Calculate all x,y coords
+    x_coords = np.arange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + in_focus_radius + 1)
+    y_coords = np.arange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + +in_focus_radius + 1)
+    xy_list = cartesian([x_coords, y_coords])
+    size_arr = np.full(xy_list.shape,(width,height))
+    # Filter out x,y coords that are out of bounds
+    greater_than_zero = np.greater(xy_list,np.zeros(xy_list.shape))
+    less_than_upper_bound = np.less(xy_list, size_arr)
+    in_bounds_coords = np.logical_and(greater_than_zero,less_than_upper_bound)
+    xy_list = xy_list[in_bounds_coords]
+    #separate x's and y's into separate arrays
+    xy_list = xy_list.T
     # Loop over x and y first so we can calculate the blur amount
-    for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + 1):
-        for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + 1):
 
-            # The blur amount depends on the euclidean distance between the pixel and focus center
-            x_distance_to_m = abs(x - middle_in_focus_x)
-            y_distance_to_m = abs(y - middle_in_focus_y)
-            distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
+    v_ciruclar_blur_mask_helper = np.vectorize(ciruclar_blur_mask_helper)
+    xy_blur_amounts = v_ciruclar_blur_mask_helper(xy_list[0],xy_list[1], middle_in_focus_x, middle_in_focus_y, in_focus_radius, no_blur_region)
+    blur_mask[xy_list[1],xy_list[0]] = xy_blur_amounts
 
-            blur_amount = 1.0
-            # Note: Not all values we iterate over are within the focus region, so we must check
-            if distance_to_m < no_blur_region:
-                # No blur
-                blur_amount = 0.0
-            # Check if we should fade to blurry so that there is not an abrupt transition
-            elif distance_to_m < in_focus_radius:
-                blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
+def ciruclar_blur_mask_helper(x, y, middle_in_focus_x, middle_in_focus_y, in_focus_radius, no_blur_region):
+    #print x,y
+    x_distance_to_m = np.absolute(x - middle_in_focus_x)
+    y_distance_to_m = np.absolute(y - middle_in_focus_y)
+    distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
+    blur_amount = 1.0
+    # Note: Not all values we iterate over are within the focus region, so we must check
+    if distance_to_m < no_blur_region:
+        # No blur
+        blur_amount = 0.0
+    # Check if we should fade to blurry so that there is not an abrupt transition
+    elif distance_to_m < in_focus_radius:
+        blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
 
-            # Set the blur_amount for 4 pixels of the same distance from the center of the in-focus region
-            if x > 0:
-                if y > 0:
-                    blur_mask[y, x] = blur_amount
-                if middle_in_focus_y + y_distance_to_m < height:
-                    blur_mask[middle_in_focus_y + y_distance_to_m, x] = blur_amount
-            if middle_in_focus_x + x_distance_to_m < width:
-                if y > 0:
-                    blur_mask[y, middle_in_focus_x + x_distance_to_m] = blur_amount
-                if middle_in_focus_y + y_distance_to_m < height:
-                    blur_mask[middle_in_focus_y + y_distance_to_m, middle_in_focus_x + x_distance_to_m] = blur_amount
+    return blur_amount
+
+
+def cartesian(arrays, out=None):
+    # This code was adapted from
+    # http://stackoverflow.com/questions/1208118/using-numpy-to-build-an-array-of-all-combinations-of-two-arrays
+    """
+    Generate a cartesian product of input arrays.
+
+    Parameters
+    ----------
+    arrays : list of array-like
+        1-D arrays to form the cartesian product of.
+    out : ndarray
+        Array to place the cartesian product in.
+
+    Returns
+    -------
+    out : ndarray
+        2-D array of shape (M, len(arrays)) containing cartesian products
+        formed of input arrays.
+
+    Examples
+    --------
+    >>> cartesian(([1, 2, 3], [4, 5], [6, 7]))
+    array([[1, 4, 6],
+           [1, 4, 7],
+           [1, 5, 6],
+           [1, 5, 7],
+           [2, 4, 6],
+           [2, 4, 7],
+           [2, 5, 6],
+           [2, 5, 7],
+           [3, 4, 6],
+           [3, 4, 7],
+           [3, 5, 6],
+           [3, 5, 7]])
+
+    """
+    dtype = arrays[0].dtype
+    n = np.prod([x.size for x in arrays])
+    if out is None:
+        out = np.zeros([n, len(arrays)], dtype=dtype)
+
+    m = n / arrays[0].size
+    out[:,0] = np.repeat(arrays[0], m)
+    if arrays[1:]:
+        cartesian(arrays[1:], out=out[0:m,1:])
+        for j in xrange(1, arrays[0].size):
+            out[j*m:(j+1)*m,1:] = out[0:m,1:]
+    return out
+
 
 
 # Run a Python implementation of ImageFilters
@@ -299,6 +352,7 @@ if __name__ == '__main__':
     # Start the clock
     start_time = time.time()
     setup_time = time.time()
+
 #==============================================================================
 #     Setup for parsing Command Line Args
 #==============================================================================
@@ -330,24 +384,24 @@ if __name__ == '__main__':
     except (OSError, IOError) as e:
         parser.error('Valid input image file name required')
 
-    width = input_image.shape[1]
-    height = input_image.shape[0]
+    width = np.int32(input_image.shape[1])
+    height = np.int32(input_image.shape[0])
 
     # Output image file name
     out_filename = args.output if args.output is not None else None
 
     output_image = np.zeros_like(input_image)
 
-    # Number of Passes - 3 passes approximates Gaussian Blur
-    num_passes = int(args.n_passes) if args.n_passes is not None else 3
+   # Number of Passes - 3 passes approximates Gaussian Blur
+    num_passes = np.int32(args.n_passes) if args.n_passes is not None else np.int32(3)
     if num_passes < 0:
         parser.error('Number of passes must be greater than 0')
     # Brightness - Between -100 and 100
-    bright = float(args.bright) if args.bright is not None else 0.0
+    bright = np.float32(args.bright) if args.bright is not None else np.float32(0.0)
     if bright > 100 or bright < -100:
         parser.error('Brightness must be between -100 and 100')
     # Saturation - Between 0 and 2, 1.0 does not produce any effect
-    sat = float(args.sat) if args.sat is not None else 1.0
+    sat = np.float32(args.sat) if args.sat is not None else np.float32(1.0)
     if sat > 5 or bright < 0:
         parser.error('Saturation must be between 0 and 5')
     # Contrast - Between -255 and 255
@@ -355,18 +409,18 @@ if __name__ == '__main__':
     if con > 255 or con < -255:
         parser.error('Contrast must be between -255 and 255')
     # Temperature - Between -255 and 255
-    temp = int(args.temp) if args.temp is not None else 0
+    temp = np.int32(args.temp) if args.temp is not None else np.int32(0)
     if temp > 255 or temp < -255:
         parser.error('Temperature must be between -255 and 255')
     # Invert - True or False
-    inv = True if args.inverse == '1' else False
-    if inv is False and args.inverse not in ['1', None]:
+    inv = np.bool_(True) if args.inverse == '1' else np.bool_(False)
+    if inv is np.bool(False) and args.inverse not in ['1', None]:
         parser.error('Inverse must be 0 or 1')
     #Threshold - Between 0 and 255
-    thresh = 100
+    thresh = np.float32(-1.0)
     apply_thresh = False
     if args.thresh is not None:
-        thresh = int(args.thresh)
+        thresh = np.float32(args.thresh)
         apply_thresh = True
         if thresh > 255 or thresh < 0:
             parser.error('Threshold must be between 0 and 255')
@@ -380,16 +434,16 @@ if __name__ == '__main__':
     focused_hor = True if args.focus == '3' else False
 
     # The y-index of the center of the in-focus region
-    middle_in_focus_y = int(args.y_center) if args.y_center is not None else height/2
+    middle_in_focus_y = np.int32(args.y_center) if args.y_center is not None else np.int32(height/2)
     if middle_in_focus_y > height or middle_in_focus_y < 0:
         parser.error('Y coord of center of focus region must be between 0 and {} for this image'.format(height-1))
     # The x-index of the center of the in-focus region
     # Note: this only matters for circular in-focus region
-    middle_in_focus_x = int(args.x_center) if args.x_center is not None else width/2
+    middle_in_focus_x = np.int32(args.x_center) if args.x_center is not None else np.int32(width/2)
     if middle_in_focus_x > width or middle_in_focus_x < 0:
         parser.error('X coord of center of focus region must be between 0 and {} for this image'.format(width-1))
     # The number of pixels distance from middle_in_focus to keep in focus
-    in_focus_radius = int(args.radius) if args.radius is not None else min(width, height)/2
+    in_focus_radius = np.int32(args.radius) if args.radius is not None else np.int32(min(width, height)/2)
     if in_focus_radius < 0:
         parser.error('Radius of focus region must be positive')
     # Accept the file name storing the blur mask
@@ -414,55 +468,62 @@ if __name__ == '__main__':
     else:
         # No blurring
         blur_mask = np.zeros(input_image.shape[:2], dtype=np.float32)
+        num_passes = 1
 
     if blur_mask.shape != input_image.shape[:2]:
         parser.error('The specified blur mask\'s shape did not match the input image\'s shape')
+
 #==============================================================================
 #     End Parsing Command Line Args
 #==============================================================================
     setup_end_time = time.time()
     print "Took {} seconds to setup".format(setup_end_time - setup_time)
 
-    local_size = (256, 256)  # This doesn't really affect speed for the Python implementation
+    local_size = np.array([256, 256])  # This doesn't really affect speed for the Python implementation
     # We need to add [1:] because the first element in this list is the number of colors in RGB, namely 3
-    global_size = tuple([round_up(g, l) for g, l in zip(input_image.shape[::-1][1:], local_size)])
-
+    gsizes = np.array(input_image.shape[::-1][1:])
+    #get global dimensions using vectorized ops
+    round_up_vector = np.vectorize(round_up)
+    global_size = round_up_vector(gsizes, local_size)
     # Set up a (N+2 x N+2) local memory buffer.
     # +2 for 1-pixel halo on all sides
-    local_memory = [[]] * (local_size[0] + 2) * (local_size[1] + 2) #np.zeros((local_size[0] + 2) * (local_size[1] + 2))
-
+    #local_memory = [[]] * (local_size[0] + 2) * (local_size[1] + 2) #np.zeros((local_size[0] + 2) * (local_size[1] + 2))
+    local_memory = [[]] * np.prod(local_size+2) #np.zeros((local_size[0] + 2) * (local_size[1] + 2))
     # Each work group will have its own private buffer.
-    buf_width = local_size[0] + 2
-    buf_height = local_size[1] + 2
-    halo = 1
+    buf_width, buf_height = local_size + 2
+    halo = np.int32(1)
 
     print "Image Width %s" % width
     print "Image Height %s" % height
 
+    np_t = np.bool_(True)
+    np_f = np.bool_(False)
     # We will perform 3 passes of the bux blur
     # effect to approximate Gaussian blurring
-    for pass_num in range(num_passes):
+    for pass_num in xrange(num_passes):
         print "In iteration %s of %s" % (pass_num + 1, num_passes)
         # We need to loop over the workgroups here,
         # because unlike OpenCL, they are not
         # automatically set up by Python
-        first_pass = False
+        first_pass = np_f
         if pass_num == 0:
             print "---First Pass---"
-            first_pass = True
-
+            first_pass = np_t
+        # Generate list of global corner coordinates to iterate over
+        global_corner_x_coords = np.arange(0, global_size[0], local_size[0])
+        global_corner_y_coords = np.arange(0, global_size[1], local_size[1])
+        global_corner_xy_list = cartesian([global_corner_x_coords, global_corner_y_coords])
         # Loop over all groups and call tiltshift once per group
-        for group_corner_x in range(0, global_size[0], local_size[0]):
-            for group_corner_y in range(0, global_size[1], local_size[1]):
-                #print "GROUP CONRER %s %s" % (group_corner_x, group_corner_y)
-                # Run tilt shift over the group and store the results in host_image_tilt_shifted
-                tiltshift(input_image, output_image, local_memory, blur_mask,
-                          width, height,
-                          buf_width, buf_height, halo,
-                          local_size[0], local_size[1],
-                          bright, sat, con, temp, inv,
-                          first_pass,
-                          group_corner_x, group_corner_y)
+        for (group_corner_x, group_corner_y) in global_corner_xy_list:
+            #print "GROUP CONRER %s %s" % (group_corner_x, group_corner_y)
+            # Run tilt shift over the group and store the results in host_image_tilt_shifted
+            tiltshift(input_image, output_image, local_memory, blur_mask,
+                      width, height,
+                      buf_width, buf_height, halo,
+                      local_size[0], local_size[1],
+                      bright, sat, con, temp, inv,
+                      first_pass,
+                      group_corner_x, group_corner_y)
 
         # Now put the output of the last pass into the input of the next pass
         input_image = output_image
