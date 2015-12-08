@@ -3,7 +3,6 @@ import os.path
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-#from skimage import color
 import time
 import argparse
 
@@ -110,13 +109,13 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
-    buffer_start = time.time()
+    image_load_start = time.time()
     # Load the image
     try:
         input_image = mpimg.imread(args.input,0)
     except (OSError, IOError) as e:
         parser.error('Valid input image file name required')
-    buffer_end = time.time()
+    image_load_end = time.time()
         
     first = input_image[...,0]
     size = first.size
@@ -291,7 +290,7 @@ if __name__ == '__main__':
     
     print "####### TIMING BREAKDOWN #######"
     print "Took %s total seconds to run %s passes" % (end_time - start_time, num_passes)  
-    print "Buffer time was %s seconds" % (buffer_end - buffer_start) 
+    print "Image load time was %s seconds" % (image_load_end - image_load_start) 
     print "Conversion time was %s seconds" % (conversion_end_time - conversion_start_time) 
     print "Enqueue time was %s seconds" % (enqueue_end_time - enqueue_start_time) 
     print "Kernel time was %s seconds" % (kernel_end_time - kernel_start_time)  

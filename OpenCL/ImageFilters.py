@@ -3,9 +3,7 @@ import os.path
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from skimage import color
 import time
-import math
 import argparse
 
 # A baseline OpenCL implementation
@@ -296,7 +294,6 @@ if __name__ == '__main__':
         if pass_num == 0:
             print "First Pass!"
 
-        print "Temp %s" % temp
         # Run tilt shift over the group and store the results in host_image_tilt_shifted
         # Loop over all groups and call tiltshift once per group
         program.tiltshift(queue, global_size, local_size,
