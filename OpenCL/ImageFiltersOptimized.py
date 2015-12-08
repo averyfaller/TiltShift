@@ -243,7 +243,6 @@ if __name__ == '__main__':
     halo = np.int32(1)
     
     quartertime = time.time()
-    print "First quarter time %s" % (quartertime - start_time)
     
     conversion_start_time = time.time()
     image_combined = np.dstack([(255 * blur_mask).astype(np.uint8), input_image[:,:,0], input_image[:,:,1],input_image[:,:,2]])
@@ -259,7 +258,6 @@ if __name__ == '__main__':
     print "Image Height %s" % height
         
     halftime = time.time()
-    print "Second quarter time %s" % (halftime - quartertime)
     
     kernel_start_time = time.time()
     # We will perform 3 passes of the bux blur 
@@ -292,6 +290,7 @@ if __name__ == '__main__':
     
     reconversion_start_time = time.time() 
     host_image_filtered = image_out[:, :, 0:3][:,:,::-1]
+    #host_image_filtered = image_out[:, :, 1:4][:,:,::-1]
     reconversion_end_time = time.time()
     end_time = time.time()
     
@@ -302,6 +301,9 @@ if __name__ == '__main__':
     print "Kernel time was %s seconds" % (kernel_end_time - kernel_start_time)  
     print "Dequeue time was %s seconds" % (dequeue_end_time - dequeue_start_time) 
     print "Reconversion time was %s seconds" % (reconversion_end_time - reconversion_start_time) 
+    print "First quarter time %s" % (quartertime - start_time)
+    print "Second quarter time %s" % (halftime - quartertime)
+    
     
     if out_filename is not None:
         # Save image
