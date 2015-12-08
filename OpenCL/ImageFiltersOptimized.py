@@ -246,11 +246,7 @@ if __name__ == '__main__':
     print "First quarter time %s" % (quartertime - start_time)
     
     conversion_start_time = time.time()
-    image_combined = (input_image[...,0].astype(np.uint32) << 16) + (input_image[...,1].astype(np.uint32) << 8) + (input_image[...,2].astype(np.uint32) << 0)
-    image_combined += ((255 * blur_mask).astype(np.uint32) << 24)
-    
-    #image_combined = np.dstack([(255 * blur_mask).astype(np.uint8), input_image])
-    #image_combined = np.dstack([(255 * blur_mask).astype(np.uint8), input_image[:,:,0], input_image[:,:,1],input_image[:,:,2]])
+    image_combined = np.dstack([(255 * blur_mask).astype(np.uint8), input_image[:,:,0], input_image[:,:,1],input_image[:,:,2]])
     conversion_end_time = time.time()
 
     # Send image to the device, non-blocking
@@ -291,19 +287,11 @@ if __name__ == '__main__':
     kernel_end_time = time.time()
     
     dequeue_start_time = time.time()
-    #cl.enqueue_copy(queue, image_out, gpu_image_a, is_blocking=True)
-    cl.enqueue_copy(queue, image_combined, gpu_image_a, is_blocking=True)
+    cl.enqueue_copy(queue, image_out, gpu_image_a, is_blocking=True)
     dequeue_end_time = time.time()
     
-    #print image_out[...,1]
-    
     reconversion_start_time = time.time() 
-    #host_image_filtered = image_out[:, :, 0:3][:,:,::-1]
-    #host_image_filtered = image_out[:, :, 1:4]
-    
-    host_image_filtered[...,0] = ((image_combined >> 16) & 0xFF)
-    host_image_filtered[...,1] = ((image_combined >> 8) & 0xFF)
-    host_image_filtered[...,2] = ((image_combined) & 0xFF)
+    host_image_filtered = image_out[:, :, 0:3][:,:,::-1]
     reconversion_end_time = time.time()
     end_time = time.time()
     
