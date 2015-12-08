@@ -297,7 +297,6 @@ if __name__ == '__main__':
     print "Second quarter time %s" % (halftime - quartertime)
     print "Last half time %s" % (end_time - halftime)
     
-    
     if out_filename is not None:
         # Save image
         mpimg.imsave(out_filename, host_image_filtered)
