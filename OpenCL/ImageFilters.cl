@@ -71,7 +71,6 @@ inline uchar4 invert(uchar4 p, bool value) {
     }
 }
 
-
 // If the pixel is above value it becomes black, otherwise white
 inline uchar4 threshold(uchar4 p, float value) {
     uchar4 new_value = p;
@@ -91,7 +90,6 @@ inline uchar4 threshold(uchar4 p, float value) {
     }
     return new_value;
 }
-
 
 // A method that takes in a matrix of 3x3 pixels and blurs 
 // the center pixel based on the surrounding pixels, a 

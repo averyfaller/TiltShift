@@ -296,6 +296,9 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
 
 # Run a Python implementation of ImageFilters
 if __name__ == '__main__':
+    # Start the clock
+    start_time = time.time()
+    
 #==============================================================================
 #     Setup for parsing Command Line Args
 #==============================================================================
@@ -333,8 +336,6 @@ if __name__ == '__main__':
     # Output image file name
     out_filename = args.output if args.output is not None else None
 
-    # Start the clock
-    start_time = time.time()
     output_image = np.zeros_like(input_image)
 
     # Number of Passes - 3 passes approximates Gaussian Blur
@@ -394,13 +395,11 @@ if __name__ == '__main__':
     # Note: There is one float blur amount per pixel
 
     # If Tilt Shift is enabled
-    if consistent_blur or focused_circle or focused_hor:
+    if consistent_blur or focused_circle or focused_hor or args.blur_mask != None:
         # Initialize blur mask to be all 1's (completely blurry)
         # Note: There is one float blur amount per pixel
-        generate_blur_mask = True
         if args.blur_mask is not None:
             blur_mask = mpimg.imread(args.blur_mask,0)
-            generate_blur_mask = False
         elif focused_hor:
             # Initialize blur mask to be all 1's (completely blurry)
             blur_mask = np.ones(input_image.shape[:2], dtype=np.float32)

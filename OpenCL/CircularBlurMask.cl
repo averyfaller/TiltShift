@@ -2,8 +2,6 @@
 __kernel void 
 blurmask(__global float* blur_mask, 
           int w, int h, 
-          int buf_w, int buf_h, 
-          const int halo,
           int middle_in_focus_x, int middle_in_focus_y, int in_focus_radius) {
 
     // Global position of output pixel
