@@ -3,9 +3,8 @@ import os.path
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from skimage import color
+#from skimage import color
 import time
-import math
 import argparse
 
 # An optimized OpenCL implementation
@@ -80,13 +79,11 @@ if __name__ == '__main__':
     
     # Create a queue for transferring data and launching computations.
     # Turn on profiling to allow us to check event times.
-    queue = cl.CommandQueue(context, context.devices[0],
-                            properties=cl.command_queue_properties.PROFILING_ENABLE)
+    queue = cl.CommandQueue(context, context.devices[0], properties=cl.command_queue_properties.PROFILING_ENABLE)
     #print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
     ts_program = cl.Program(context, open('ImageFiltersOptimized.cl').read()).build(options=['-I', curdir])
-    
     
 #==============================================================================
 #     Setup for parsing Command Line Args
@@ -113,19 +110,22 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
+    buffer_start = time.time()
     # Load the image
     try:
         input_image = mpimg.imread(args.input,0)
     except (OSError, IOError) as e:
         parser.error('Valid input image file name required')
-
-    size = input_image[...,0].size
-    width = np.int32(input_image[...,0].shape[1])
-    height =  np.int32(input_image[...,0].shape[0])
+    buffer_end = time.time()
+        
+    first = input_image[...,0]
+    size = first.size
+    width = np.int32(first.shape[1])
+    height =  np.int32(first.shape[0])
     
     # These settings for local_size appear to work best on my computer, not entirely sure why
     # (HD Graphics 4000 [Type: GPU] Maximum work group size 512)
-    local_size = (64, 8)
+    local_size = (128, 4)
     global_size = tuple([round_up(g, l) for g, l in zip((width, height), local_size)])
     
     # Output image file name
@@ -164,6 +164,7 @@ if __name__ == '__main__':
         if thresh > 255 or thresh < 0:
             parser.error('Threshold must be between 0 and 255')
             
+
     # Focus Type (default None)
     # Consistent blur
     consistent_blur = True if args.focus == '1' else False
@@ -172,27 +173,27 @@ if __name__ == '__main__':
     # Horizontal in-focus region
     focused_hor = True if args.focus == '3' else False     
 
-    # The y-index of the center of the in-focus region
-    middle_in_focus_y = np.int32(args.y_center) if args.y_center is not None else np.int32(height/2)
-    if middle_in_focus_y > height or middle_in_focus_y < 0:
-        parser.error('Y coord of center of focus region must be between 0 and {} for this image'.format(height-1))
-    # The x-index of the center of the in-focus region
-    # Note: this only matters for circular in-focus region
-    middle_in_focus_x = np.int32(args.x_center) if args.x_center is not None else np.int32(width/2)
-    if middle_in_focus_x > width or middle_in_focus_x < 0:
-        parser.error('X coord of center of focus region must be between 0 and {} for this image'.format(width-1))
-    # The number of pixels distance from middle_in_focus to keep in focus
-    in_focus_radius = np.int32(args.radius) if args.radius is not None else np.int32(min(width, height)/2)
-    if in_focus_radius < 0:
-        parser.error('Radius of focus region must be positive')
-    # Accept the file name storing the blur mask
-    # Note: There is one float blur amount per pixel
-
     # If Tilt Shift is enabled
     if consistent_blur or focused_circle or focused_hor or args.blur_mask != None:
         if args.blur_mask is not None:
+            # Accept the file name storing the blur mask
+            # Note: There is one float blur amount per pixel
             blur_mask = mpimg.imread(args.blur_mask,0)
         else:
+            # The y-index of the center of the in-focus region
+            middle_in_focus_y = np.int32(args.y_center) if args.y_center is not None else np.int32(height/2)
+            if middle_in_focus_y > height or middle_in_focus_y < 0:
+                parser.error('Y coord of center of focus region must be between 0 and {} for this image'.format(height-1))
+            # The x-index of the center of the in-focus region
+            # Note: this only matters for circular in-focus region
+            middle_in_focus_x = np.int32(args.x_center) if args.x_center is not None else np.int32(width/2)
+            if middle_in_focus_x > width or middle_in_focus_x < 0:
+                parser.error('X coord of center of focus region must be between 0 and {} for this image'.format(width-1))
+            # The number of pixels distance from middle_in_focus to keep in focus
+            in_focus_radius = np.int32(args.radius) if args.radius is not None else np.int32(min(width, height)/2)
+            if in_focus_radius < 0:
+                parser.error('Radius of focus region must be positive')
+
             # Initialize blur mask to be all 1's (completely blurry)
             blur_mask = np.ones(input_image.shape[:2], dtype=np.float32)
             # Generate the blur mask
@@ -221,6 +222,7 @@ if __name__ == '__main__':
 #     End Parsing Command Line Args
 #==============================================================================
 
+
     image_out = np.zeros(shape=(height, width, 4), dtype=np.uint8)
     
     # Make the placeholders for the output image and output combined
@@ -236,6 +238,7 @@ if __name__ == '__main__':
     buf_width = np.int32(local_size[0] + 2)
     buf_height = np.int32(local_size[1] + 2)
     halo = np.int32(1)
+
     
     quartertime = time.time()
     
@@ -288,6 +291,7 @@ if __name__ == '__main__':
     
     print "####### TIMING BREAKDOWN #######"
     print "Took %s total seconds to run %s passes" % (end_time - start_time, num_passes)  
+    print "Buffer time was %s seconds" % (buffer_end - buffer_start) 
     print "Conversion time was %s seconds" % (conversion_end_time - conversion_start_time) 
     print "Enqueue time was %s seconds" % (enqueue_end_time - enqueue_start_time) 
     print "Kernel time was %s seconds" % (kernel_end_time - kernel_start_time)  

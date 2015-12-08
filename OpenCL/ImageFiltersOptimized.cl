@@ -59,7 +59,6 @@ inline int4 contrast(int4 p, float value) {
     return new_value;
 }
 
-
 // Increases the warmth or coolness of a pixel
 inline int4 temperature(int4 p, float value) {
     int4 new_value = p;
