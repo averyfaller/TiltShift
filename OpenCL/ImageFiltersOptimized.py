@@ -144,11 +144,11 @@ if __name__ == '__main__':
     if sat > 5 or bright < 0:
         parser.error('Saturation must be between 0 and 5')
     # Contrast - Between -255 and 255
-    con = np.float32(args.con) if args.con is not None else np.float32(20.0)
+    con = np.float32(args.con) if args.con is not None else np.float32(0.0)
     if con > 255 or con < -255:
         parser.error('Contrast must be between -255 and 255')
     # Temperature - Between -255 and 255
-    temp = np.int32(args.temp) if args.temp is not None else np.int32(-1)
+    temp = np.int32(args.temp) if args.temp is not None else np.int32(0)
     if temp > 255 or temp < -255:
         parser.error('Temperature must be between -255 and 255')
     # Invert - True or False

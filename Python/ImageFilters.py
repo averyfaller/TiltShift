@@ -351,10 +351,11 @@ if __name__ == '__main__':
     if sat > 5 or bright < 0:
         parser.error('Saturation must be between 0 and 5')
     # Contrast - Between -255 and 255
+    con = np.float32(args.con) if args.con is not None else np.float32(0.0)
     if con > 255 or con < -255:
         parser.error('Contrast must be between -255 and 255')
     # Temperature - Between -255 and 255
-    temp = int(args.temp) if args.temp is not None else -1
+    temp = int(args.temp) if args.temp is not None else 0
     if temp > 255 or temp < -255:
         parser.error('Temperature must be between -255 and 255')
     # Invert - True or False
@@ -400,14 +401,14 @@ if __name__ == '__main__':
         # Note: There is one float blur amount per pixel
         if args.blur_mask is not None:
             blur_mask = mpimg.imread(args.blur_mask,0)
-        elif focused_hor:
+        else:
             # Initialize blur mask to be all 1's (completely blurry)
             blur_mask = np.ones(input_image.shape[:2], dtype=np.float32)
             # Generate the blur mask
             if focused_circle:
                 print "Creating circular blur mask"
                 generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
-            else:
+            elif focused_hor:
                 print "Creating horizontal blur mask"
                 generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
     else:

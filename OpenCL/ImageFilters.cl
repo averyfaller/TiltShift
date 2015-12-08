@@ -48,11 +48,9 @@ inline uchar4 temperature(uchar4 p, float value) {
     uchar4 new_value = p;
     
     if (value > 0) {
-        uchar red = truncate(p.y + value);
-        new_value.y = red;
+        new_value.y = truncate(p.y + value);
     } else if (value < 0) {
-        uchar blue = truncate(p.w + value);
-        new_value.w = blue;
+        new_value.w = truncate(p.w - value);
     }
 
     return new_value;        
