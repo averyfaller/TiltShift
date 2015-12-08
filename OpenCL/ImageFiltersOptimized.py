@@ -57,32 +57,32 @@ if __name__ == '__main__':
     
      # List our platforms
     platforms = cl.get_platforms()
-    print 'The platforms detected are:'
-    print '---------------------------'
-    for platform in platforms:
-        print platform.name, platform.vendor, 'version:', platform.version
+    #print 'The platforms detected are:'
+    #print '---------------------------'
+    #for platform in platforms:
+        #print platform.name, platform.vendor, 'version:', platform.version
     
     # List devices in each platform
-    for platform in platforms:
-        print 'The devices detected on platform', platform.name, 'are:'
-        print '---------------------------'
-        for device in platform.get_devices():
-            print device.name, '[Type:', cl.device_type.to_string(device.type), ']'
-            print 'Maximum clock Frequency:', device.max_clock_frequency, 'MHz'
-            print 'Maximum allocable memory size:', int(device.max_mem_alloc_size / 1e6), 'MB'
-            print 'Maximum work group size', device.max_work_group_size
-            print '---------------------------'
+    #for platform in platforms:
+        #print 'The devices detected on platform', platform.name, 'are:'
+        #print '---------------------------'
+        #for device in platform.get_devices():
+            #print device.name, '[Type:', cl.device_type.to_string(device.type), ']'
+            #print 'Maximum clock Frequency:', device.max_clock_frequency, 'MHz'
+            #print 'Maximum allocable memory size:', int(device.max_mem_alloc_size / 1e6), 'MB'
+            #print 'Maximum work group size', device.max_work_group_size
+            #print '---------------------------'
 
     # Create a context with all the devices
     devices = platforms[0].get_devices()
     context = cl.Context(devices[1:])
-    print 'This context is associated with ', len(context.devices), 'devices'
+    #print 'This context is associated with ', len(context.devices), 'devices'
     
     # Create a queue for transferring data and launching computations.
     # Turn on profiling to allow us to check event times.
     queue = cl.CommandQueue(context, context.devices[0],
                             properties=cl.command_queue_properties.PROFILING_ENABLE)
-    print 'The queue is using the device:', queue.device.name
+    #print 'The queue is using the device:', queue.device.name
 
     curdir = os.path.dirname(os.path.realpath(__file__))
     ts_program = cl.Program(context, open('ImageFiltersOptimized.cl').read()).build(options=['-I', curdir])
@@ -225,11 +225,6 @@ if __name__ == '__main__':
     
     # Make the placeholders for the output image and output combined
     host_image_filtered = np.zeros_like(input_image)
-    #print blur_mask[350,:]
-    
-    print middle_in_focus_x
-    print middle_in_focus_y
-    print in_focus_radius
         
     gpu_image_a = cl.Buffer(context, cl.mem_flags.READ_WRITE, size * 32)
     gpu_image_b = cl.Buffer(context, cl.mem_flags.READ_WRITE, size * 32)
@@ -254,8 +249,8 @@ if __name__ == '__main__':
     cl.enqueue_copy(queue, gpu_image_a, image_combined, is_blocking=False)
     enqueue_end_time = time.time()
     
-    print "Image Width %s" % width
-    print "Image Height %s" % height
+    #print "Image Width %s" % width
+    #print "Image Height %s" % height
         
     halftime = time.time()
     
@@ -263,13 +258,11 @@ if __name__ == '__main__':
     # We will perform 3 passes of the bux blur 
     # effect to approximate Gaussian blurring
     for pass_num in range(num_passes):
-        print "In iteration %s of %s" % (pass_num + 1, num_passes)
+        #print "In iteration %s of %s" % (pass_num + 1, num_passes)
         # We need to loop over the workgroups here, 
         # because unlike OpenCL, they are not 
         # automatically set up by Python
         a_pass_num = np.int32(pass_num)
-        if pass_num == 0:
-            print "First Pass!"
             
         # Run tilt shift over the group and store the results in host_image_tilt_shifted
         # Loop over all groups and call tiltshift once per group    
@@ -290,7 +283,6 @@ if __name__ == '__main__':
     
     reconversion_start_time = time.time() 
     host_image_filtered = image_out[:, :, 0:3][:,:,::-1]
-    #host_image_filtered = image_out[:, :, 1:4][:,:,::-1]
     reconversion_end_time = time.time()
     end_time = time.time()
     
@@ -303,6 +295,7 @@ if __name__ == '__main__':
     print "Reconversion time was %s seconds" % (reconversion_end_time - reconversion_start_time) 
     print "First quarter time %s" % (quartertime - start_time)
     print "Second quarter time %s" % (halftime - quartertime)
+    print "Last half time %s" % (end_time - halftime)
     
     
     if out_filename is not None:

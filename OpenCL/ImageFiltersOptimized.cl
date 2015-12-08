@@ -11,12 +11,16 @@ inline uchar truncate(int value) {
 
 // Adjusts the brightness on a pixel    
 inline uchar4 brightness(uchar4 p, float value) {
-    uchar red = truncate(p.y + value);
-    uchar green = truncate(p.z + value);
-    uchar blue = truncate(p.w + value);
+    if (value != 0) {
+        uchar red = truncate(p.y + value);
+        uchar green = truncate(p.z + value);
+        uchar blue = truncate(p.w + value);
 
-    uchar4 new_value = {p.x, red, green, blue};
-    return new_value;
+        uchar4 new_value = {p.x, red, green, blue};
+        
+        return new_value;
+    }
+    return p;
 }
 
 // Adjusts the saturation of a pixel    
@@ -65,9 +69,8 @@ inline uchar4 invert(uchar4 p, bool value) {
         uchar blue = truncate(255 - p.w);
         uchar4 new_value = {p.x, red, green, blue};
         return new_value;
-    } else {
-        return p;
     }
+    return p;
 }
 
 // If the pixel is above value it becomes black, otherwise white
@@ -103,7 +106,7 @@ inline uint boxblur(uchar4 p0, uchar4 p1, uchar4 p2,
     // Calculate the blur amount for the central and 
     // neighboring pixels
     float self_blur_amount = (9 - (blur_amount * 8)) / 9;
-    float other_blur_amount = blur_amount / 9;
+    float other_blur_amount = (blur_amount / 9);
     
     // Sum a weighted average of self and others based on the blur amount
     uchar red_v = (self_blur_amount * p4.y) + (other_blur_amount * (p0.y + p1.y + p2.y + p3.y + p5.y + p6.y + p7.y + p8.y));
@@ -207,4 +210,6 @@ tiltshift(__global __read_only uchar4* in_values,
         uint blurred_pixel = boxblur(p0, p1, p2, p3, p4, p5, p6, p7, p8);
         out_values[y * w + x] = blurred_pixel;
     }
+    
+    //barrier(CLK_GLOBAL_MEM_FENCE);
 }
