@@ -78,7 +78,7 @@ def saturation(image, value):
     return np.dstack((red_v, green_v, blue_v))
 
 # Adjusts the contrast on a pixel
-# Contrast algorithm adapted from: 
+# Contrast algorithm adapted from:
 # http://www.dfstudios.co.uk/articles/programming/image-programming-algorithms/image-processing-algorithms-part-5-contrast-adjustment/
 def contrast(image, value):
     factor = (259 * (value + 255)) / float(255 * (259 - value))
@@ -147,32 +147,33 @@ def truncate(image):
 # and stores the blur mask in the blur_mask parameter (np.array)
 def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
     # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
+    # get vector of all y values
+    y_v = np.arange(middle_in_focus - in_focus_radius, middle_in_focus + in_focus_radius + 1)
 
     # Loop over y first so we can calculate the blur amount
     # fade out 20% to blurry so that there is not an abrupt transition
     no_blur_region = .8 * in_focus_radius
-    # Set blur amount for focus middle
-    #blur_row = np.array([blur_mask])
-    blur_row = np.zeros_like(blur_mask[0], dtype=np.float)
-    blur_mask[middle_in_focus] = blur_row
-    # Simulataneously set blur amount for both rows of same distance from middle
-    for y in xrange(middle_in_focus - in_focus_radius, middle_in_focus):
-        # The blur amount depends on the y-value of the pixel
-        distance_to_m = abs(y - middle_in_focus)
-        # Note: Because we are iterating over all y's in the focus region, all the y's are within
-        # the focus radius.
-        # Thus, we need only check if we should fade to blurry so that there is not an abrupt transition
-        if distance_to_m > no_blur_region:
-            # Calculate blur ammount
-            blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
-        else:
-            # No blur
-            blur_amount = 0.0
-        blur_row.fill(blur_amount)
-        if y > 0:
-            blur_mask[y] = blur_row
-        if middle_in_focus + distance_to_m < height:
-            blur_mask[middle_in_focus + distance_to_m] = blur_row
+    no_blur_region_v = np.full(y_v.shape, .8 * in_focus_radius)
+
+    # The blur amount depends on the y-value of the pixel
+    # Calculate distance to center of focus region
+    distance_to_m_v = np.absolute(y_v - middle_in_focus)
+
+    # determine which y values are in the transition region
+    in_transition = np.greater(distance_to_m_v, no_blur_region_v)
+
+    # calculate the blur amount for each y assuming it is in transition
+    in_transition_blur_amounts = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m_v - no_blur_region)
+    # filter out y values not in the transition region
+    filtered_in_transition_blur_amounts = in_transition_blur_amounts[in_transition]
+    in_transition_blur_amounts_matrix = np.tile(filtered_in_transition_blur_amounts, (blur_mask.shape[1],1)).T
+    # set blur amounts to zero
+    y_blur_amounts = np.zeros((y_v.shape[0],blur_mask.shape[1]))
+    # set transition region y values to blur amount
+    y_blur_amounts[in_transition] = in_transition_blur_amounts_matrix
+    #set blur mask
+    blur_mask[y_v] = y_blur_amounts
+
 
 # Generates a circular horizontal blur mask using the x and y coordinates of the focus middle,
 # focus radius, and image height, and stores the blur mask in the blur_mask parameter (np.array)
