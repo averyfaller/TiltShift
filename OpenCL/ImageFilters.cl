@@ -1,68 +1,84 @@
 // Ensures a pixel's value for a color is between 0 and 255
-inline uchar truncate(int value) {
-    uchar toreturn = value;
-    if (value < 0) {
-        toreturn = 0;
-    } else if (value > 255) {
-        toreturn = 255;
+inline uchar4 truncate(int4 p) {
+    int red = p.y;
+    int green = p.z;
+    int blue = p.w;
+    
+    if (red < 0) {
+        red = 0;
+    } else if (red > 255) {
+        red = 255;
     }
-    return toreturn;
-}
-
-// Adjusts the brightness on a pixel    
-inline uchar4 brightness(uchar4 p, float value) {
-    uchar red = truncate(p.y + value);
-    uchar green = truncate(p.z + value);
-    uchar blue = truncate(p.w + value);
-
+    
+    if (green < 0) {
+        green = 0;
+    } else if (green > 255) {
+        green = 255;
+    }
+    
+    if (blue < 0) {
+        blue = 0;
+    } else if (blue > 255) {
+        blue = 255;
+    }
+    
     uchar4 new_value = {p.x, red, green, blue};
     return new_value;
 }
 
+// Adjusts the brightness on a pixel    
+inline int4 brightness(int4 p, float value) {
+    int red = p.y + value;
+    int green = p.z + value;
+    int blue = p.w + value;
+
+    int4 new_value = {p.x, red, green, blue};
+    return new_value;
+}
+
 // Adjusts the saturation of a pixel    
-inline uchar4 saturation(uchar4 p, float value) {
+inline int4 saturation(int4 p, float value) {
     float P = sqrt((p.y * p.y * .299) + (p.z * p.z * .587) + (p.w * p.w * .114));
         
-    uchar red_v = truncate(P + ((p.y - P) * value));
-    uchar green_v = truncate(P + ((p.z - P) * value));
-    uchar blue_v = truncate(P + (((float)p.w - P) * value));
+    int red_v = P + ((p.y - P) * value);
+    int green_v = P + ((p.z - P) * value);
+    int blue_v = P + (((float)p.w - P) * value);
 
-    uchar4 new_value = {p.x, red_v, green_v, blue_v};
+    int4 new_value = {p.x, red_v, green_v, blue_v};
     return new_value;
 }
     
 // Adjusts the contrast of a pixel    
-inline uchar4 contrast(uchar4 p, float value) {
+inline int4 contrast(int4 p, float value) {
     float factor = (259 * (value + 255.0)) / (255 * (259.0 - value));
-    uchar red_v = truncate(factor * (p.y - 128) + 128);
-    uchar green_v = truncate(factor * (p.z - 128) + 128);
-    uchar blue_v = truncate(factor * (p.w - 128) + 128);
+    int red_v = factor * (p.y - 128) + 128;
+    int green_v = factor * (p.z - 128) + 128;
+    int blue_v = factor * (p.w - 128) + 128;
 
-    uchar4 new_value = {p.x, red_v, green_v, blue_v};
+    int4 new_value = {p.x, red_v, green_v, blue_v};
     return new_value;
 }
 
-
 // Increases the warmth or coolness of a pixel
-inline uchar4 temperature(uchar4 p, float value) {
-    uchar4 new_value = p;
+inline int4 temperature(int4 p, float value) {
+    int4 new_value = p;
     
     if (value > 0) {
-        new_value.y = truncate(p.y + value);
+        new_value.y = p.y + value;
     } else if (value < 0) {
-        new_value.w = truncate(p.w - value);
+        new_value.w = p.w - value;
     }
 
     return new_value;        
 }            
 
 // Inverts the colors, producing the same image that would be found in a film negative
-inline uchar4 invert(uchar4 p, bool value) {
+inline int4 invert(int4 p, bool value) {
     if (value) {
-        uchar red = truncate(255 - p.y);
-        uchar green = truncate(255 - p.z);
-        uchar blue = truncate(255 - p.w);
-        uchar4 new_value = {p.x, red, green, blue};
+        int red = 255 - p.y;
+        int green = 255 - p.z;
+        int blue = 255 - p.w;
+        int4 new_value = {p.x, red, green, blue};
         return new_value;
     } else {
         return p;
@@ -70,8 +86,8 @@ inline uchar4 invert(uchar4 p, bool value) {
 }
 
 // If the pixel is above value it becomes black, otherwise white
-inline uchar4 threshold(uchar4 p, float value) {
-    uchar4 new_value = p;
+inline int4 threshold(int4 p, float value) {
+    int4 new_value = p;
     if (value > 0) {
         float pixel_avg = (p.y + p.z + p.w) / 3.0;
         
@@ -102,13 +118,14 @@ inline uint boxblur(uchar4 p0, uchar4 p1, uchar4 p2,
     // Calculate the blur amount for the central and 
     // neighboring pixels
     float self_blur_amount = (9 - (blur_amount * 8)) / 9;
-    float other_blur_amount = blur_amount / 9;
+    float other_blur_amount = (blur_amount / 9);
     
     // Sum a weighted average of self and others based on the blur amount
     uchar red_v = (self_blur_amount * p4.y) + (other_blur_amount * (p0.y + p1.y + p2.y + p3.y + p5.y + p6.y + p7.y + p8.y));
     uchar green_v = (self_blur_amount * p4.z) + (other_blur_amount * (p0.z + p1.z + p2.z + p3.z + p5.z + p6.z + p7.z + p8.z));
     uchar blue_v = (self_blur_amount * p4.w) + (other_blur_amount * (p0.w + p1.w + p2.w + p3.w + p5.w + p6.w + p7.w + p8.w));
-        
+    
+    //uchar4 blur = {p4.x, red_v, green_v, blue_v};
     uint blur = (p4.x << 24) + (red_v << 16) + (green_v << 8) + blue_v;
     return blur;
 }
@@ -120,7 +137,7 @@ inline uint boxblur(uchar4 p0, uchar4 p1, uchar4 p2,
 // All of the work for a workgroup happens in one thread in 
 // this method
 __kernel void
-tiltshift(__global __read_only uint* in_values, 
+tiltshift(__global __read_only uchar4* in_values, 
           __global __write_only uint* out_values, 
           __local uchar4* buf, 
           int w, int h, 
@@ -169,18 +186,19 @@ tiltshift(__global __read_only uint* in_values,
             } else if (buf_corner_y + tmp_y >= h) {
                 tmp_y--;
             }
-             
-            uint accessed = in_values[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
-            uchar4 expanded = {((accessed >> 24) & 0xFF), ((accessed >> 16) & 0xFF), ((accessed >> 8) & 0xFF), ((accessed) & 0xFF)};
-            
+               
+            uchar4 expanded = in_values[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
+
             // If we're in the first pass, perform the saturation, contrast, etc. adjustments
             if (pass_num == 0) {
-                expanded = brightness(expanded, bright);
-                expanded = saturation(expanded, sat);
-                expanded = contrast(expanded, con);
-                expanded = temperature(expanded, temp);
-                expanded = invert(expanded, inv);
-                expanded = threshold(expanded, thresh);
+                int4 int_expanded = {expanded.x, expanded.y, expanded.z, expanded.w};
+                int_expanded = brightness(int_expanded, bright);
+                int_expanded = saturation(int_expanded, sat);
+                int_expanded = contrast(int_expanded, con);
+                int_expanded = temperature(int_expanded, temp);
+                int_expanded = invert(int_expanded, inv);
+                int_expanded = threshold(int_expanded, thresh);
+                expanded = truncate(int_expanded);
             }
             
             buf[row * buf_w + idx_1D] = expanded;

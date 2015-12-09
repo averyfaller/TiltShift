@@ -1,4 +1,6 @@
 # Image Filters with OpenCL
+Sam Daulton, Avery Faller, Isadora Nun
+A Final Project for CS205
 
 #### A library for applying filters to images.
 1. Tilt Shift Effect (circular or horizontal focus region, or consistent blur)
