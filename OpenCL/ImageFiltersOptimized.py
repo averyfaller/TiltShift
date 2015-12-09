@@ -238,7 +238,6 @@ if __name__ == '__main__':
     buf_height = np.int32(local_size[1] + 2)
     halo = np.int32(1)
 
-    
     quartertime = time.time()
     
     conversion_start_time = time.time()
@@ -250,9 +249,6 @@ if __name__ == '__main__':
     enqueue_start_time = time.time()
     cl.enqueue_copy(queue, gpu_image_a, image_combined, is_blocking=False)
     enqueue_end_time = time.time()
-    
-    #print "Image Width %s" % width
-    #print "Image Height %s" % height
         
     halftime = time.time()
     
