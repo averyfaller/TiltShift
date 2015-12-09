@@ -10,35 +10,35 @@ import argparse
 
 def numpy_boxblur(image, blur_mask, iterations=3):
     ''' boxblur using numpy '''
-    
+
     blur_mask = blur_mask.astype(np.float)
     self_blur_mask = (9 - (blur_mask * 8)) / 9.0
     other_blur_mask = blur_mask / 9.0
-    
+
     red = image[...,0].astype(np.float)
     green = image[...,1].astype(np.float)
     blue = image[...,2].astype(np.float)
-    
+
     blur_weights = np.dstack((other_blur_mask, other_blur_mask, other_blur_mask,
                        other_blur_mask, self_blur_mask, other_blur_mask,
-                       other_blur_mask, other_blur_mask, other_blur_mask))    
+                       other_blur_mask, other_blur_mask, other_blur_mask))
     iterations = 1
-        
+
     for i in range(iterations):
         red_padded = np.pad(red, 1, mode='edge')
         green_padded = np.pad(green, 1, mode='edge')
         blue_padded = np.pad(blue, 1, mode='edge')
-        
+
         red_stacked = np.dstack((red_padded[:-2,  :-2], red_padded[:-2,  1:-1], red_padded[:-2,  2:],
                                  red_padded[1:-1, :-2], red_padded[1:-1, 1:-1], red_padded[1:-1, 2:],
                                  red_padded[2:,   :-2], red_padded[2:,   1:-1], red_padded[2:,   2:]))
         green_stacked = np.dstack((green_padded[:-2,  :-2], green_padded[:-2,  1:-1], green_padded[:-2,  2:],
                                    green_padded[1:-1, :-2], green_padded[1:-1, 1:-1], green_padded[1:-1, 2:],
-                                   green_padded[2:,   :-2], green_padded[2:,   1:-1], green_padded[2:,   2:])) 
+                                   green_padded[2:,   :-2], green_padded[2:,   1:-1], green_padded[2:,   2:]))
         blue_stacked = np.dstack((blue_padded[:-2,  :-2], blue_padded[:-2,  1:-1], blue_padded[:-2,  2:],
                                   blue_padded[1:-1, :-2], blue_padded[1:-1, 1:-1], blue_padded[1:-1, 2:],
-                                  blue_padded[2:,   :-2], blue_padded[2:,   1:-1], blue_padded[2:,   2:])) 
-        
+                                  blue_padded[2:,   :-2], blue_padded[2:,   1:-1], blue_padded[2:,   2:]))
+
         red = np.average(red_stacked, axis=2, weights=blur_weights).astype(np.uint8)
         green = np.average(green_stacked, axis=2, weights=blur_weights).astype(np.uint8)
         blue = np.average(blue_stacked, axis=2, weights=blur_weights).astype(np.uint8)
@@ -48,7 +48,7 @@ def numpy_boxblur(image, blur_mask, iterations=3):
 
 # Adjusts the brightness on a pixel
 def brightness(image, value):
-    
+
     red = image[...,0] + value
     green = image[...,1] + value
     blue = image[...,2] + value
@@ -65,31 +65,31 @@ def saturation(image, value):
     Pr = np.float(0.299)
     Pg = np.float(0.587)
     Pb = np.float(0.114)
-    
+
     red = image[...,0].astype(np.float)
     green = image[...,1].astype(np.float)
     blue = image[...,2].astype(np.float)
 
     P = np.sqrt(red*red*Pr + green*green*Pg + blue*blue*Pb)
-    
+
     red_v = (P + ((red - P) * value))
     green_v = (P + ((green - P) * value))
     blue_v = (P + ((blue - P) * value))
-    
+
     return np.dstack((red_v, green_v, blue_v))
 
 # Adjusts the contrast on a pixel
 def contrast(image, value):
     factor = (259 * (value + 255)) / float(255 * (259 - value))
-    
+
     red = image[...,0].astype(np.float)
     green = image[...,1].astype(np.float)
     blue = image[...,2].astype(np.float)
-    
+
     red_v = factor * (red - 128) + 128
     green_v = factor * (green - 128) + 128
     blue_v = factor * (blue - 128) + 128
-    
+
     return np.dstack((red_v, green_v, blue_v))
 
 #Increases the warmth or coolness of a pixel
@@ -97,7 +97,7 @@ def temperature(image, value):
     red = image[...,0]
     green = image[...,1]
     blue = image[...,2]
-    
+
     if value > 0:
         red = red + value
     elif value < 0:
@@ -112,7 +112,7 @@ def invert(image, value):
         green = 255 - image[...,1]
         blue = 255 - image[...,2]
         return np.dstack((red, green, blue))
-        
+
     return image
 
 #If the pixel is above value it becomes black, otherwise white
@@ -121,16 +121,16 @@ def threshold(image, value, apply):
         red = image[...,0]
         green = image[...,1]
         blue = image[...,2]
-        
+
         pixel_av = (red + green + blue) / 3.0
 
         values = np.ones_like(pixel_av) * value
         greater = np.greater(pixel_av, values)
-        
+
         zeros = np.zeros_like(pixel_av)
-        
+
         each = zeros + (greater * 255)
-        
+
         return np.dstack((each, each, each))
     return image
 
@@ -175,46 +175,6 @@ def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, h
 
 # Generates a circular horizontal blur mask using the x and y coordinates of the focus middle,
 # focus radius, and image height, and stores the blur mask in the blur_mask parameter (np.array)
-def generate_circular_blur_mask1(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height):
-    # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
-
-    # Fade out 20% to blurry so that there is not an abrupt transition
-    no_blur_region = .8 * in_focus_radius
-
-    # Loop over x and y first so we can calculate the blur amount
-    for x in xrange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + 1):
-        for y in xrange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + 1):
-
-            # The blur amount depends on the euclidean distance between the pixel and focus center
-            x_distance_to_m = abs(x - middle_in_focus_x)
-            y_distance_to_m = abs(y - middle_in_focus_y)
-            distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
-
-            blur_amount = 1.0
-            # Note: Not all values we iterate over are within the focus region, so we must check
-            if distance_to_m < no_blur_region:
-                # No blur
-                blur_amount = 0.0
-            # Check if we should fade to blurry so that there is not an abrupt transition
-            elif distance_to_m < in_focus_radius:
-                blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
-
-            # Set the blur_amount for 4 pixels of the same distance from the center of the in-focus region
-            if x > 0:
-                if y > 0:
-                    blur_mask[y, x] = blur_amount
-                if middle_in_focus_y + y_distance_to_m < height:
-                    blur_mask[middle_in_focus_y + y_distance_to_m, x] = blur_amount
-            if middle_in_focus_x + x_distance_to_m < width:
-                if y > 0:
-                    blur_mask[y, middle_in_focus_x + x_distance_to_m] = blur_amount
-                if middle_in_focus_y + y_distance_to_m < height:
-                    blur_mask[middle_in_focus_y + y_distance_to_m, middle_in_focus_x + x_distance_to_m] = blur_amount
-            
-            
-            
-# Generates a circular horizontal blur mask using the x and y coordinates of the focus middle,
-# focus radius, and image height, and stores the blur mask in the blur_mask parameter (np.array)
 def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height):
     # Calculate blur amount for each pixel based on middle_in_focus and in_focus_radius
 
@@ -227,21 +187,32 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
     x_coords = np.arange(middle_in_focus_x - in_focus_radius, middle_in_focus_x + in_focus_radius + 1)
     y_coords = np.arange(middle_in_focus_y - in_focus_radius, middle_in_focus_y + in_focus_radius + 1)
     xy_list = cartesian([x_coords, y_coords])
+
+    # Check if coordinates are in image bounds
     size_arr = np.full(xy_list.shape,(width,height))
-    # Filter out x,y coords that are out of bounds
     greater_than_zero = np.greater(xy_list,np.zeros(xy_list.shape))
+    greater_than_zero = greater_than_zero.T
+    greater_than_zero = np.logical_and(greater_than_zero[0],greater_than_zero[1]).T
     less_than_upper_bound = np.less(xy_list, size_arr)
+    less_than_upper_bound = less_than_upper_bound.T
+    less_than_upper_bound = np.logical_and(less_than_upper_bound[0],less_than_upper_bound[1]).T
     in_bounds_coords = np.logical_and(greater_than_zero,less_than_upper_bound)
+
+    # Drop out of bounds coordinates
     xy_list = xy_list[in_bounds_coords]
+
     #separate x's and y's into separate arrays
     xy_list = xy_list.T
-    # Loop over x and y first so we can calculate the blur amount
 
+    # Loop over x and y first so we can calculate the blur amount
     v_ciruclar_blur_mask_helper = np.vectorize(ciruclar_blur_mask_helper)
     xy_blur_amounts = v_ciruclar_blur_mask_helper(xy_list[0],xy_list[1], middle_in_focus_x, middle_in_focus_y, in_focus_radius, no_blur_region)
     blur_mask[xy_list[1],xy_list[0]] = xy_blur_amounts
 
 def ciruclar_blur_mask_helper(x, y, middle_in_focus_x, middle_in_focus_y, in_focus_radius, no_blur_region):
+    # a function that is vectorized in generate_circular_blur_mask
+    # takes vectors x,y as parameters and returns a vector of blur amounts
+    # one for each x,y pair
     x_distance_to_m = np.absolute(x - middle_in_focus_x)
     y_distance_to_m = np.absolute(y - middle_in_focus_y)
     distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
@@ -420,7 +391,7 @@ if __name__ == '__main__':
             # Generate the blur mask
             if focused_circle:
                 print "Creating circular blur mask"
-                generate_circular_blur_mask1(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
+                generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y, in_focus_radius, width, height)
             elif focused_hor:
                 print "Creating horizontal blur mask"
                 generate_horizontal_blur_mask(blur_mask, middle_in_focus_y, in_focus_radius, height)
@@ -440,19 +411,19 @@ if __name__ == '__main__':
 
     print "Image Width %s" % width
     print "Image Height %s" % height
-    
+
     input_image = brightness(input_image,bright)
     input_image = saturation(input_image, sat)
     input_image = contrast(input_image, con)
     input_image = temperature(input_image, temp)
     input_image = invert(input_image, inv)
     input_image = threshold(input_image, thresh, apply_thresh)
-    
+
     # NOW CUTOFF THE VALUES AND RETURN AS UINT8
     input_image = truncate(input_image)
-    
+
     #print blur_mask[50,]
-    
+
     blur_time = time.time()
     print "Performing boxblur"
     input_image = numpy_boxblur(input_image, blur_mask, num_passes)
@@ -460,7 +431,7 @@ if __name__ == '__main__':
     end_time = time.time()
     print "TOTAL - Took %s seconds to run %s passes" % (end_time - start_time, num_passes)
     print "Blur time %s" % (end_time - blur_time)
-    
+
     if out_filename is not None:
         # Save image
         mpimg.imsave(out_filename, input_image)
