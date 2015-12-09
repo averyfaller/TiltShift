@@ -23,9 +23,7 @@ def numpy_boxblur(image, blur_mask, iterations=3):
                        other_blur_mask, self_blur_mask, other_blur_mask,
                        other_blur_mask, other_blur_mask, other_blur_mask))    
     iterations = 1
-    
-    print blur_weights[200,300,:]
-    
+        
     for i in range(iterations):
         red_padded = np.pad(red, 1, mode='edge')
         green_padded = np.pad(green, 1, mode='edge')
@@ -138,12 +136,10 @@ def threshold(p,value,apply):
 
 # Ensures a pixel's value for a color is between 0 and 255
 def truncate(image):
-    print image[250,...]
     zeros = np.zeros_like(image)
     ones = np.ones_like(image) * 255
     image = np.maximum(image, zeros)
     image = np.minimum(image, ones)
-    print image[250,...]
     return image
 
 # generates horizontal blur mask using focus middle, focus radius, and image height,
