@@ -48,30 +48,6 @@ def numpy_boxblur(image, blur_mask, iterations=3):
     image = np.dstack((red, green, blue))
     return image
 
-
-# A method that takes in a matrix of 3x3 pixels and blurs
-# the center pixel based on the surrounding pixels, a
-# bluramount of 1 is full blur and will weight the neighboring
-# pixels equally with the pixel that is being modified.
-# While a bluramount of 0 will result in no blurring.
-def boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8):
-    # Calculate the blur amount for the central and
-    # neighboring pixels
-    self_blur_amount = (9 - (blur_amount * 8)) / 9.0
-    other_blur_amount = blur_amount / 9.0
-
-    # Sum a weighted average of self and others based on the blur amount
-    #print "--------"
-    #print 0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0]
-
-    red_v = (self_blur_amount * p4[0]) + (other_blur_amount * (0 + p0[0] + p1[0] + p2[0] + p3[0] + p5[0] + p6[0] + p7[0] + p8[0]))
-    green_v = (self_blur_amount * p4[1]) + (other_blur_amount * (0 + p0[1] + p1[1] + p2[1] + p3[1] + p5[1] + p6[1] + p7[1] + p8[1]))
-    blue_v = (self_blur_amount * p4[2]) + (other_blur_amount * (0 + p0[2] + p1[2] + p2[2] + p3[2] + p5[2] + p6[2] + p7[2] + p8[2]))
-    #print "Original %s" % p4
-    #print "New %s" % [int(red_v), int(blue_v), int(green_v)]
-    #print "--------"
-    return [int(red_v), int(green_v), int(blue_v)]
-
 # Adjusts the brightness on a pixel
 def brightness(p,value):
     red = truncate(p[0] + value)
@@ -80,38 +56,41 @@ def brightness(p,value):
 
     return [red, green, blue]
 
-# Adjusts the saturation of a pixel
+# Adjusts the saturation of an image
 # 0.0 creates a black-and-white image.
 # 0.5 reduces the color saturation by half.
 # 1.0 causes no change.
 # 2.0 doubles the color saturation.
-def saturation(p, value):
-    # red_v = p[0] * (1 - value)
-    # blue_v = p[1] * (1 - value)
-    # green_v = p[2] * (1 - value)
-    Pr = 0.299
-    Pg = 0.587
-    Pb= 0.114
-
-    red = int(p[0])
-    green = int(p[1])
-    blue = int(p[2])
+def saturation(image, value):
+    Pr = np.float(0.299)
+    Pg = np.float(0.587)
+    Pb = np.float(0.114)
+    
+    red = image[...,0].astype(np.float)
+    green = image[...,1].astype(np.float)
+    blue = image[...,2].astype(np.float)
 
     P = np.sqrt(red*red*Pr + green*green*Pg + blue*blue*Pb)
-
-    red_v = truncate(P+(red-P)*value)
-    green_v = truncate(P+(green-P)*value)
-    blue_v = truncate(P+(blue-P)*value)
-
-    return [red_v, green_v, blue_v]
+    
+    red_v = (P + ((red - P) * value))
+    green_v = (P + ((green - P) * value))
+    blue_v = (P + ((blue - P) * value))
+    
+    return np.dstack((red_v, green_v, blue_v))
 
 # Adjusts the contrast on a pixel
-def contrast(p, value):
+def contrast(image, value):
     factor = (259 * (value + 255)) / float(255 * (259 - value))
-    red = truncate(factor * (p[0] - 128) + 128)
-    green = truncate(factor * (p[1] - 128) + 128)
-    blue = truncate(factor * (p[2] - 128) + 128)
-    return [red, green, blue]
+    
+    red = image[...,0].astype(np.float)
+    green = image[...,1].astype(np.float)
+    blue = image[...,2].astype(np.float)
+    
+    red_v = factor * (red - 128) + 128
+    green_v = factor * (green - 128) + 128
+    blue_v = factor * (blue - 128) + 128
+    
+    return np.dstack((red_v, green_v, blue_v))
 
 #Increases the warmth or coolness of a pixel
 def temperature(p,value):
@@ -158,13 +137,14 @@ def threshold(p,value,apply):
     return [red, green, blue]
 
 # Ensures a pixel's value for a color is between 0 and 255
-def truncate(value):
-    if value < 0:
-        value = 0
-    elif value > 255:
-        value = 255
-
-    return value
+def truncate(image):
+    print image[250,...]
+    zeros = np.zeros_like(image)
+    ones = np.ones_like(image) * 255
+    image = np.maximum(image, zeros)
+    image = np.minimum(image, ones)
+    print image[250,...]
+    return image
 
 # Applies the tilt-shift effect onto an image (grayscale for now)
 # g_corner_x, and g_corner_y are needed in this Python
@@ -303,7 +283,6 @@ def generate_circular_blur_mask(blur_mask, middle_in_focus_x, middle_in_focus_y,
     blur_mask[xy_list[1],xy_list[0]] = xy_blur_amounts
 
 def ciruclar_blur_mask_helper(x, y, middle_in_focus_x, middle_in_focus_y, in_focus_radius, no_blur_region):
-    #print x,y
     x_distance_to_m = np.absolute(x - middle_in_focus_x)
     y_distance_to_m = np.absolute(y - middle_in_focus_y)
     distance_to_m = (x_distance_to_m ** 2 + y_distance_to_m ** 2) ** 0.5
@@ -527,21 +506,31 @@ if __name__ == '__main__':
     global_corner_y_coords = np.arange(0, global_size[1], local_size[1])
     global_corner_xy_list = cartesian([global_corner_x_coords, global_corner_y_coords])
     # Loop over all groups and call tiltshift once per group
-    for (group_corner_x, group_corner_y) in global_corner_xy_list:
+    #for (group_corner_x, group_corner_y) in global_corner_xy_list:
         # Run tilt shift over the group and store the results in host_image_tilt_shifted
-        tiltshift(input_image, output_image, local_memory,
-                      width, height,
-                      buf_width, buf_height, halo,
-                      local_size[0], local_size[1],
-                      bright, sat, con, temp, inv,
-                      group_corner_x, group_corner_y)
+    #    tiltshift(input_image, output_image, local_memory,
+    #                  width, height,
+    #                  buf_width, buf_height, halo,
+    #                  local_size[0], local_size[1],
+    #                  bright, sat, con, temp, inv,
+    #                  group_corner_x, group_corner_y)
 
     # Now put the output of the last pass into the input of the next pass
-    input_image = output_image
+    #input_image = output_image
+    
+    
+    #p4 = brightness(p4,bright)
+    input_image = saturation(input_image, sat)
+    #p4 = temperature(p4,temp)
+    #p4 = invert(p4, inv)
+    #p4 = threshold(p4, thresh, apply_thresh)
+    input_image = contrast(input_image, con)
+    
+    # NOW CUTOFF THE VALUES AND RETURN AS UINT8
+    input_image = truncate(input_image)
     
     blur_time = time.time()
     print "Performing boxblur"
-    
     input_image = numpy_boxblur(input_image, blur_mask, num_passes)
 
     end_time = time.time()
