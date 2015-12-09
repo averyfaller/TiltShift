@@ -146,83 +146,6 @@ def truncate(image):
     print image[250,...]
     return image
 
-# Applies the tilt-shift effect onto an image (grayscale for now)
-# g_corner_x, and g_corner_y are needed in this Python
-# implementation since we don't have thread methods to get our
-# position.  Here they store the top left corner of the group.
-# All of the work for a workgroup happens in one thread in
-# this method
-def tiltshift(input_image, output_image, buf,
-              w, h,
-              buf_w, buf_h, halo,
-              l_w, l_h,
-              bright, sat, con, temp, inv,
-              g_corner_x, g_corner_y):
-
-    # coordinates of the upper left corner of the buffer in image space, including halo
-    buf_corner_x = g_corner_x - halo
-    buf_corner_y = g_corner_y - halo
-
-    # Load all pixels into the buffer from input_image
-    # Loop over y values first, so we can load rows sequentially
-    for row in range(0, buf_h):
-        for col in range(0, buf_w):
-            tmp_x = col
-            tmp_y = row
-
-            # Now ensure the pixel we are about to load is inside the image's boundaries
-            if (buf_corner_x + tmp_x < 0) :
-                tmp_x += 1
-            elif (buf_corner_x + tmp_x >= w):
-                tmp_x -= 1
-
-            if (buf_corner_y + tmp_y < 0):
-                tmp_y += 1
-            elif (buf_corner_y + tmp_y >= h):
-                tmp_y -= 1
-
-            # Check you are within halo of global
-            if ((buf_corner_y + tmp_y < h) and (buf_corner_x + tmp_x < w)):
-                #input_image[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
-                buf[row * buf_w + col] = input_image[buf_corner_y + tmp_y, buf_corner_x + tmp_x];
-                
-    # Loop over y first so we can calculate the blur amount
-    for ly in range(0, l_h):
-        # Initialize Global y Position
-        y = ly + g_corner_y
-        # Initialize Buffer y Position
-        buf_y = ly + halo;
-
-        for lx in range(0, l_w):
-            # Initialize Global x Position
-            x = lx + g_corner_x
-            # Initialize Buffer x Position
-            buf_x = lx + halo;
-
-            # Stay in bounds check is necessary due to possible
-            # images with size not nicely divisible by workgroup size
-            if ((y < h) and (x < w)):
-
-                p4 = buf[(buf_y * buf_w) + buf_x];
-                p4 = brightness(p4,bright)
-                p4 = saturation(p4, sat)
-                p4 = temperature(p4,temp)
-                p4 = invert(p4, inv)
-                p4 = threshold(p4, thresh, apply_thresh)
-                p4 = contrast(p4, con)
-
-                output_image[y, x] = p4
-
-    # Return the output of the last pass
-    return output_image
-
-# Rounds up the size to a be multiple of the group_size
-def round_up(global_size, group_size):
-    r = global_size % group_size
-    if r == 0:
-        return global_size
-    return global_size + group_size - r
-
 # generates horizontal blur mask using focus middle, focus radius, and image height,
 # and stores the blur mask in the blur_mask parameter (np.array)
 def generate_horizontal_blur_mask(blur_mask, middle_in_focus, in_focus_radius, height):
@@ -347,8 +270,6 @@ def cartesian(arrays, out=None):
             out[j*m:(j+1)*m,1:] = out[0:m,1:]
     return out
 
-
-
 # Run a Python implementation of ImageFilters
 if __name__ == '__main__':
     # Start the clock
@@ -394,7 +315,7 @@ if __name__ == '__main__':
 
     output_image = np.zeros_like(input_image)
 
-   # Number of Passes - 3 passes approximates Gaussian Blur
+    # Number of Passes - 3 passes approximates Gaussian Blur
     num_passes = np.int32(args.n_passes) if args.n_passes is not None else np.int32(3)
     if num_passes < 0:
         parser.error('Number of passes must be greater than 0')
@@ -481,50 +402,15 @@ if __name__ == '__main__':
     setup_end_time = time.time()
     print "Took {} seconds to setup".format(setup_end_time - setup_time)
 
-    local_size = np.array([256, 256])  # This doesn't really affect speed for the Python implementation
-    # We need to add [1:] because the first element in this list is the number of colors in RGB, namely 3
-    gsizes = np.array(input_image.shape[::-1][1:])
-    #get global dimensions using vectorized ops
-    round_up_vector = np.vectorize(round_up)
-    global_size = round_up_vector(gsizes, local_size)
-    # Set up a (N+2 x N+2) local memory buffer.
-    # +2 for 1-pixel halo on all sides
-    #local_memory = [[]] * (local_size[0] + 2) * (local_size[1] + 2) #np.zeros((local_size[0] + 2) * (local_size[1] + 2))
-    local_memory = [[]] * np.prod(local_size+2) #np.zeros((local_size[0] + 2) * (local_size[1] + 2))
-    # Each work group will have its own private buffer.
-    buf_width, buf_height = local_size + 2
-    halo = np.int32(1)
-
     print "Image Width %s" % width
     print "Image Height %s" % height
-
-    np_t = np.bool_(True)
-    np_f = np.bool_(False)
-
-    # Generate list of global corner coordinates to iterate over
-    global_corner_x_coords = np.arange(0, global_size[0], local_size[0])
-    global_corner_y_coords = np.arange(0, global_size[1], local_size[1])
-    global_corner_xy_list = cartesian([global_corner_x_coords, global_corner_y_coords])
-    # Loop over all groups and call tiltshift once per group
-    #for (group_corner_x, group_corner_y) in global_corner_xy_list:
-        # Run tilt shift over the group and store the results in host_image_tilt_shifted
-    #    tiltshift(input_image, output_image, local_memory,
-    #                  width, height,
-    #                  buf_width, buf_height, halo,
-    #                  local_size[0], local_size[1],
-    #                  bright, sat, con, temp, inv,
-    #                  group_corner_x, group_corner_y)
-
-    # Now put the output of the last pass into the input of the next pass
-    #input_image = output_image
-    
     
     #p4 = brightness(p4,bright)
     input_image = saturation(input_image, sat)
+    input_image = contrast(input_image, con)
     #p4 = temperature(p4,temp)
     #p4 = invert(p4, inv)
     #p4 = threshold(p4, thresh, apply_thresh)
-    input_image = contrast(input_image, con)
     
     # NOW CUTOFF THE VALUES AND RETURN AS UINT8
     input_image = truncate(input_image)
