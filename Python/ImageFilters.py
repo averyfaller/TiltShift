@@ -6,7 +6,7 @@ import time
 import math
 import argparse
 
-# A basic Python implementation of ImageFilters
+# A NumPy implementation of ImageFilters
 
 def numpy_boxblur(image, blur_mask, iterations=3):
     ''' boxblur using numpy '''
@@ -22,7 +22,6 @@ def numpy_boxblur(image, blur_mask, iterations=3):
     blur_weights = np.dstack((other_blur_mask, other_blur_mask, other_blur_mask,
                        other_blur_mask, self_blur_mask, other_blur_mask,
                        other_blur_mask, other_blur_mask, other_blur_mask))
-    iterations = 1
 
     for i in range(iterations):
         red_padded = np.pad(red, 1, mode='edge')
@@ -287,7 +286,7 @@ if __name__ == '__main__':
 #==============================================================================
 #     Setup for parsing Command Line Args
 #==============================================================================
-    parser = argparse.ArgumentParser(description='Image Effects (in pure Python)')
+    parser = argparse.ArgumentParser(description='Image Effects (in NumPy)')
     parser.add_argument('-i','--input', help='Input image file name',required=True)
     parser.add_argument('-o','--output',help='Output image file name (required to save new image)', required=False)
     parser.add_argument('-n','--n_passes', help='Number of box blur passes',required=False)
@@ -408,29 +407,27 @@ if __name__ == '__main__':
 #     End Parsing Command Line Args
 #==============================================================================
     setup_end_time = time.time()
-    print "Took {} seconds to setup".format(setup_end_time - setup_time)
 
-    print "Image Width %s" % width
-    print "Image Height %s" % height
-
+    # Image Effects
+    iamge_effects_start_time = time.time()
     input_image = brightness(input_image,bright)
     input_image = saturation(input_image, sat)
     input_image = contrast(input_image, con)
     input_image = temperature(input_image, temp)
     input_image = invert(input_image, inv)
     input_image = threshold(input_image, thresh, apply_thresh)
-
     # NOW CUTOFF THE VALUES AND RETURN AS UINT8
     input_image = truncate(input_image)
+    iamge_effects_end_time = time.time()
 
-    #print blur_mask[50,]
-
+    # Box Blur
     blur_time = time.time()
-    print "Performing boxblur"
     input_image = numpy_boxblur(input_image, blur_mask, num_passes)
 
     end_time = time.time()
     print "TOTAL - Took %s seconds to run %s passes" % (end_time - start_time, num_passes)
+    print "Setup time %s" % (setup_end_time - setup_time)
+    print "Image effects %s" % (iamge_effects_end_time - iamge_effects_start_time)
     print "Blur time %s" % (end_time - blur_time)
 
     if out_filename is not None:

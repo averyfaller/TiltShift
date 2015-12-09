@@ -22,8 +22,10 @@ We provide code to perform these effects in both pure Python (Python/) and OpenC
 ## How to use the library (from the UNIX command line):
 Note: For this example we will run the program OpenCL/ImageFilters.py to filter the NY.jpg image
 ### Basic: 
-    python ./ImageFilters.py -i [path_to_input_file] 
+    python ./ImageFilters.py -i [path_to_input_file]
+
 This will run the image at the specified path through the ImageFilters code.  Add effects by specifying which effect you want to run and the amount.  For a list of all available effects run:
+
     python ImageFilters.py -h
 
 ### Description: 
