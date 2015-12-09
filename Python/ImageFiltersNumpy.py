@@ -8,6 +8,47 @@ import argparse
 
 # A basic Python implementation of ImageFilters
 
+def numpy_boxblur(image, blur_mask, iterations=3):
+    ''' boxblur using numpy '''
+    
+    blur_mask = blur_mask.astype(np.float)
+    self_blur_mask = (9 - (blur_mask * 8)) / 9.0
+    other_blur_mask = blur_mask / 9.0
+    
+    red = image[...,0].astype(np.float)
+    green = image[...,1].astype(np.float)
+    blue = image[...,2].astype(np.float)
+    
+    blur_weights = np.dstack((other_blur_mask, other_blur_mask, other_blur_mask,
+                       other_blur_mask, self_blur_mask, other_blur_mask,
+                       other_blur_mask, other_blur_mask, other_blur_mask))    
+    iterations = 1
+    
+    print blur_weights[200,300,:]
+    
+    for i in range(iterations):
+        red_padded = np.pad(red, 1, mode='edge')
+        green_padded = np.pad(green, 1, mode='edge')
+        blue_padded = np.pad(blue, 1, mode='edge')
+        
+        red_stacked = np.dstack((red_padded[:-2,  :-2], red_padded[:-2,  1:-1], red_padded[:-2,  2:],
+                                 red_padded[1:-1, :-2], red_padded[1:-1, 1:-1], red_padded[1:-1, 2:],
+                                 red_padded[2:,   :-2], red_padded[2:,   1:-1], red_padded[2:,   2:]))
+        green_stacked = np.dstack((green_padded[:-2,  :-2], green_padded[:-2,  1:-1], green_padded[:-2,  2:],
+                                   green_padded[1:-1, :-2], green_padded[1:-1, 1:-1], green_padded[1:-1, 2:],
+                                   green_padded[2:,   :-2], green_padded[2:,   1:-1], green_padded[2:,   2:])) 
+        blue_stacked = np.dstack((blue_padded[:-2,  :-2], blue_padded[:-2,  1:-1], blue_padded[:-2,  2:],
+                                  blue_padded[1:-1, :-2], blue_padded[1:-1, 1:-1], blue_padded[1:-1, 2:],
+                                  blue_padded[2:,   :-2], blue_padded[2:,   1:-1], blue_padded[2:,   2:])) 
+        
+        red = np.average(red_stacked, axis=2, weights=blur_weights).astype(np.uint8)
+        green = np.average(green_stacked, axis=2, weights=blur_weights).astype(np.uint8)
+        blue = np.average(blue_stacked, axis=2, weights=blur_weights).astype(np.uint8)
+
+    image = np.dstack((red, green, blue))
+    return image
+
+
 # A method that takes in a matrix of 3x3 pixels and blurs
 # the center pixel based on the surrounding pixels, a
 # bluramount of 1 is full blur and will weight the neighboring
@@ -131,12 +172,11 @@ def truncate(value):
 # position.  Here they store the top left corner of the group.
 # All of the work for a workgroup happens in one thread in
 # this method
-def tiltshift(input_image, output_image, buf, blur_mask,
+def tiltshift(input_image, output_image, buf,
               w, h,
               buf_w, buf_h, halo,
               l_w, l_h,
               bright, sat, con, temp, inv,
-              first_pass,
               g_corner_x, g_corner_y):
 
     # coordinates of the upper left corner of the buffer in image space, including halo
@@ -165,6 +205,7 @@ def tiltshift(input_image, output_image, buf, blur_mask,
             if ((buf_corner_y + tmp_y < h) and (buf_corner_x + tmp_x < w)):
                 #input_image[((buf_corner_y + tmp_y) * w) + buf_corner_x + tmp_x];
                 buf[row * buf_w + col] = input_image[buf_corner_y + tmp_y, buf_corner_x + tmp_x];
+                
     # Loop over y first so we can calculate the blur amount
     for ly in range(0, l_h):
         # Initialize Global y Position
@@ -181,34 +222,16 @@ def tiltshift(input_image, output_image, buf, blur_mask,
             # Stay in bounds check is necessary due to possible
             # images with size not nicely divisible by workgroup size
             if ((y < h) and (x < w)):
-                # Get blur amount using global x,y
-                blur_amount = blur_mask[y,x]
 
-                p0 = buf[((buf_y - 1) * buf_w) + buf_x - 1]
-                p1 = buf[((buf_y - 1) * buf_w) + buf_x]
-                p2 = buf[((buf_y - 1) * buf_w) + buf_x + 1]
-                p3 = buf[(buf_y * buf_w) + buf_x - 1]
-                p4 = buf[(buf_y * buf_w) + buf_x]
-                p5 = buf[(buf_y * buf_w) + buf_x + 1]
-                p6 = buf[((buf_y + 1) * buf_w) + buf_x - 1]
-                p7 = buf[((buf_y + 1) * buf_w) + buf_x]
-                p8 = buf[((buf_y + 1) * buf_w) + buf_x + 1];
+                p4 = buf[(buf_y * buf_w) + buf_x];
+                p4 = brightness(p4,bright)
+                p4 = saturation(p4, sat)
+                p4 = temperature(p4,temp)
+                p4 = invert(p4, inv)
+                p4 = threshold(p4, thresh, apply_thresh)
+                p4 = contrast(p4, con)
 
-                if first_pass:
-                    p4 = brightness(p4,bright)
-                    p4 = saturation(p4, sat)
-                    p4 = temperature(p4,temp)
-                    p4 = invert(p4, inv)
-
-                    p4 = threshold(p4,thresh,apply_thresh)
-                    p4 = contrast(p4, con)
-
-                # Perform boxblur
-                blurred_pixel = boxblur(blur_amount, p0, p1, p2, p3, p4, p5, p6, p7, p8)
-
-                # If we're in the last pass, perform the saturation and contrast adjustments as well
-
-                output_image[y, x] = blurred_pixel
+                output_image[y, x] = p4
 
     # Return the output of the last pass
     return output_image
@@ -498,38 +521,33 @@ if __name__ == '__main__':
 
     np_t = np.bool_(True)
     np_f = np.bool_(False)
-    # We will perform 3 passes of the bux blur
-    # effect to approximate Gaussian blurring
-    for pass_num in xrange(num_passes):
-        print "In iteration %s of %s" % (pass_num + 1, num_passes)
-        # We need to loop over the workgroups here,
-        # because unlike OpenCL, they are not
-        # automatically set up by Python
-        first_pass = np_f
-        if pass_num == 0:
-            print "---First Pass---"
-            first_pass = np_t
-        # Generate list of global corner coordinates to iterate over
-        global_corner_x_coords = np.arange(0, global_size[0], local_size[0])
-        global_corner_y_coords = np.arange(0, global_size[1], local_size[1])
-        global_corner_xy_list = cartesian([global_corner_x_coords, global_corner_y_coords])
-        # Loop over all groups and call tiltshift once per group
-        for (group_corner_x, group_corner_y) in global_corner_xy_list:
-            #print "GROUP CONRER %s %s" % (group_corner_x, group_corner_y)
-            # Run tilt shift over the group and store the results in host_image_tilt_shifted
-            tiltshift(input_image, output_image, local_memory, blur_mask,
+
+    # Generate list of global corner coordinates to iterate over
+    global_corner_x_coords = np.arange(0, global_size[0], local_size[0])
+    global_corner_y_coords = np.arange(0, global_size[1], local_size[1])
+    global_corner_xy_list = cartesian([global_corner_x_coords, global_corner_y_coords])
+    # Loop over all groups and call tiltshift once per group
+    for (group_corner_x, group_corner_y) in global_corner_xy_list:
+        # Run tilt shift over the group and store the results in host_image_tilt_shifted
+        tiltshift(input_image, output_image, local_memory,
                       width, height,
                       buf_width, buf_height, halo,
                       local_size[0], local_size[1],
                       bright, sat, con, temp, inv,
-                      first_pass,
                       group_corner_x, group_corner_y)
 
-        # Now put the output of the last pass into the input of the next pass
-        input_image = output_image
-    end_time = time.time()
-    print "Took %s seconds to run %s passes" % (end_time - start_time, num_passes)
+    # Now put the output of the last pass into the input of the next pass
+    input_image = output_image
+    
+    blur_time = time.time()
+    print "Performing boxblur"
+    
+    input_image = numpy_boxblur(input_image, blur_mask, num_passes)
 
+    end_time = time.time()
+    print "TOTAL - Took %s seconds to run %s passes" % (end_time - start_time, num_passes)
+    print "Blur time %s" % (end_time - blur_time)
+    
     if out_filename is not None:
         # Save image
         mpimg.imsave(out_filename, input_image)
