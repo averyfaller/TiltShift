@@ -162,7 +162,6 @@ if __name__ == '__main__':
         apply_thresh = True
         if thresh > 255 or thresh < 0:
             parser.error('Threshold must be between 0 and 255')
-            
 
     # Focus Type (default None)
     # Consistent blur
@@ -220,7 +219,6 @@ if __name__ == '__main__':
 #==============================================================================
 #     End Parsing Command Line Args
 #==============================================================================
-
 
     image_out = np.zeros(shape=(height, width, 4), dtype=np.uint8)
     

@@ -48,7 +48,9 @@ inline int4 saturation(int4 p, float value) {
     return new_value;
 }
     
-// Adjusts the contrast of a pixel    
+// Adjusts the contrast of a pixel
+// Contrast algorithm adapted from: 
+// http://www.dfstudios.co.uk/articles/programming/image-programming-algorithms/image-processing-algorithms-part-5-contrast-adjustment/
 inline int4 contrast(int4 p, float value) {
     float factor = (259 * (value + 255.0)) / (255 * (259.0 - value));
     int red_v = factor * (p.y - 128) + 128;

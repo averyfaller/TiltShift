@@ -79,6 +79,8 @@ def saturation(image, value):
     return np.dstack((red_v, green_v, blue_v))
 
 # Adjusts the contrast on a pixel
+# Contrast algorithm adapted from: 
+# http://www.dfstudios.co.uk/articles/programming/image-programming-algorithms/image-processing-algorithms-part-5-contrast-adjustment/
 def contrast(image, value):
     factor = (259 * (value + 255)) / float(255 * (259 - value))
 
@@ -226,7 +228,6 @@ def ciruclar_blur_mask_helper(x, y, middle_in_focus_x, middle_in_focus_y, in_foc
         blur_amount = (1.0 / (in_focus_radius - no_blur_region)) * (distance_to_m - no_blur_region)
 
     return blur_amount
-
 
 def cartesian(arrays, out=None):
     # This code was adapted from

@@ -1,5 +1,6 @@
 # Image Filters with OpenCL
 Sam Daulton, Avery Faller, Isadora Nun
+
 A Final Project for CS205
 
 #### A library for applying filters to images.
@@ -16,16 +17,17 @@ A Final Project for CS205
 In this project, we provide code to perform image manipulations, including Box Blur, as well as Saturation and Contrast adjustments.
 Taken together, these effects can be combined to produce images which appear to be Tilt Shifted.
 
-We provide code to perform these effects in both pure Python (Python/) and OpenCL (OpenCL/), which can be run on computers with GPUs.  In the OpenCL folder, you will find two implementations, a baseline implementation (OpenCL/ImageFilters.py) and an optimized implementation (OpenCL/ImageFiltersOptimized.py).
+We provide code to perform these effects in both pure Python (Python/) and OpenCL (OpenCL/), which can be run on computers with GPUs.  In the OpenCL folder, you will find two implementations, a baseline implementation (OpenCL/ImageFilters.py) and an optimized implementation (OpenCL/ImageFilters.py).
 
 ## How to use the library (from the UNIX command line):
 Note: For this example we will run the program OpenCL/ImageFilters.py to filter the NY.jpg image
-### Name: 
-    ./ImageFilters.py -- filters image
-### Synopsis: 
-    ./ImageFilters.py -i [path_to_input_file] [-bcfimnorstwxyz] [parameters]
+### Basic: 
+    python ./ImageFilters.py -i [path_to_input_file] 
+This will run the image at the specified path through the ImageFilters code.  Add effects by specifying which effect you want to run and the amount.  For a list of all available effects run:
+    python ImageFilters.py -h
+
 ### Description: 
-Given an image file as input, the program modifies the image using a specified filter.
+Given an image file as input, the program modifies the image using specified filters.
 
 #### Required parameters:
 ##### -i, --input
