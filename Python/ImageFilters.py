@@ -383,9 +383,10 @@ if __name__ == '__main__':
     # If Tilt Shift is enabled
     if consistent_blur or focused_circle or focused_hor or args.blur_mask != None:
         # Initialize blur mask to be all 1's (completely blurry)
-        # Note: There is one float blur amount per pixel
         if args.blur_mask is not None:
-            blur_mask = mpimg.imread(args.blur_mask,0)
+            # Accept the file name storing the blur mask
+            print "Using user provided blur mask"
+            blur_mask = np.load(args.blur_mask)
         else:
             # Initialize blur mask to be all 1's (completely blurry)
             blur_mask = np.ones(input_image.shape[:2], dtype=np.float32)

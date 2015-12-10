@@ -121,6 +121,8 @@ if __name__ == '__main__':
     size = first.size
     width = np.int32(first.shape[1])
     height =  np.int32(first.shape[0])
+    print width
+    print height
     
     # These settings for local_size appear to work best on my computer, not entirely sure why
     # (HD Graphics 4000 [Type: GPU] Maximum work group size 512)
@@ -175,8 +177,8 @@ if __name__ == '__main__':
     if consistent_blur or focused_circle or focused_hor or args.blur_mask != None:
         if args.blur_mask is not None:
             # Accept the file name storing the blur mask
-            # Note: There is one float blur amount per pixel
-            blur_mask = mpimg.imread(args.blur_mask,0)
+            print "Using user provided blur mask"
+            blur_mask = np.load(args.blur_mask)
         else:
             # The y-index of the center of the in-focus region
             middle_in_focus_y = np.int32(args.y_center) if args.y_center is not None else np.int32(height/2)
